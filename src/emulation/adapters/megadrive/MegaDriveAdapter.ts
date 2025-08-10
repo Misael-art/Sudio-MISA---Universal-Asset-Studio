@@ -88,14 +88,24 @@ export class MegaDriveAdapter {
     // Plane A
     if (snapshot.vram && typeof vdp.planeABase === 'number') {
       const tmA = this.reconstructTilemapFromVRAM(snapshot.vram, vdp.planeABase, width, height, diagnostics);
-      layers.push({ kind: 'BG', tileset, tilemap: tmA, paletteGroup: [0], scroll: { x: vdp.hScroll || 0, y: vdp.vScroll || 0 }, priorityOrder: 0 });
+      const lineScrollX = this.computeLineScrollX(snapshot.vram, vdp, snapshot.height || this.height, diagnostics);
+      const columnScrollY = this.computeColumnScrollY(snapshot.vsram, diagnostics);
+      layers.push({
+        kind: 'BG', tileset, tilemap: tmA, paletteGroup: [0],
+        scroll: { x: vdp.hScroll || 0, y: vdp.vScroll || 0 },
+        lineScrollX,
+        columnScrollY,
+        priorityOrder: 0,
+      });
       diagnostics?.push(`Plane A base=0x${vdp.planeABase.toString(16)}`);
     }
 
     // Plane B
     if (snapshot.vram && typeof vdp.planeBBase === 'number') {
       const tmB = this.reconstructTilemapFromVRAM(snapshot.vram, vdp.planeBBase, width, height, diagnostics);
-      layers.push({ kind: 'BG', tileset, tilemap: tmB, paletteGroup: [0], scroll: { x: 0, y: 0 }, priorityOrder: 1 });
+      const lineScrollX = this.computeLineScrollX(snapshot.vram, vdp, snapshot.height || this.height, diagnostics);
+      const columnScrollY = this.computeColumnScrollY(snapshot.vsram, diagnostics);
+      layers.push({ kind: 'BG', tileset, tilemap: tmB, paletteGroup: [0], scroll: { x: 0, y: 0 }, lineScrollX, columnScrollY, priorityOrder: 1 });
       diagnostics?.push(`Plane B base=0x${vdp.planeBBase.toString(16)}`);
     }
 
@@ -115,6 +125,69 @@ export class MegaDriveAdapter {
     // Ordenar por prioridade declarada (placeholder até ler prioridade real)
     layers.sort((a, b) => (a.priorityOrder ?? 0) - (b.priorityOrder ?? 0));
     return layers;
+  }
+
+  private computeLineScrollX(vram?: Uint8Array, vdp?: ReturnType<typeof parseVDPRegisters>, frameHeight?: number, diagnostics?: string[]): number[] | undefined {
+    if (!vram || !vdp) return undefined;
+    const mode = vdp.scrollMode?.h ?? 'full';
+    const base = vdp.hScrollTableBase ?? 0;
+    const h = Math.max(0, Math.min(frameHeight ?? this.height, 512));
+    // Para 'full', não precisa de tabela
+    if (mode === 'full') return undefined;
+    // safety bounds
+    if (base <= 0 || base >= vram.length) {
+      diagnostics?.push(`HScroll table base inválida ou ausente (0x${base.toString(16)})`);
+      return undefined;
+    }
+    try {
+      const out = new Array<number>(h).fill(0);
+      // Leitura simples: palavras little-endian por linha (aproximação robusta)
+      // Se 'cell', replicamos valor por bloco de 8 linhas
+      const step = 2;
+      let offset = base;
+      if (mode === 'line') {
+        for (let y = 0; y < h; y++) {
+          if (offset + 1 >= vram.length) break;
+          const val = (vram[offset] | (vram[offset + 1] << 8)) & 0x3FF; // 10-bit
+          out[y] = val;
+          offset += step;
+        }
+      } else if (mode === 'cell') {
+        // um valor por célula vertical de 8px; replicar por 8 linhas
+        const cells = Math.ceil(h / 8);
+        for (let c = 0; c < cells; c++) {
+          if (offset + 1 >= vram.length) break;
+          const val = (vram[offset] | (vram[offset + 1] << 8)) & 0x3FF;
+          for (let y = c * 8; y < Math.min((c + 1) * 8, h); y++) out[y] = val;
+          offset += step;
+        }
+      }
+      diagnostics?.push(`HScroll (${mode}) carregado de 0x${base.toString(16)}`);
+      return out;
+    } catch {
+      diagnostics?.push('Falha ao ler HScroll table da VRAM');
+      return undefined;
+    }
+  }
+
+  private computeColumnScrollY(vsram?: Uint8Array, diagnostics?: string[]): number[] | undefined {
+    if (!vsram || vsram.length < 2) return undefined;
+    try {
+      // 40 colunas visíveis em 320px, cada palavra 10-bit
+      const columns = 40;
+      const out = new Array<number>(columns).fill(0);
+      for (let i = 0; i < columns; i++) {
+        const off = i * 2;
+        if (off + 1 >= vsram.length) break;
+        const val = (vsram[off] | (vsram[off + 1] << 8)) & 0x3FF;
+        out[i] = val;
+      }
+      diagnostics?.push(`VScroll (colunas) carregado de VSRAM (${Math.min(vsram.length, columns * 2)} bytes)`);
+      return out;
+    } catch {
+      diagnostics?.push('Falha ao ler VScroll por coluna de VSRAM');
+      return undefined;
+    }
   }
 
   private extractSprites(snapshot: MDMemorySnapshot, palettes: Palette[], tileset: Tileset, diagnostics?: string[]): Sprite[] {
