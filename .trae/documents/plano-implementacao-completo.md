@@ -66,6 +66,22 @@ Notas:
 - `src/emulation/cores.ts` já lista os nomes esperados; mantenha esses nomes ao exportar.
 - O `useEmulator` consome automaticamente essas funções quando presentes.
 
+Exemplo de export no C (ilustrativo):
+```c
+#include <stdint.h>
+#include <emscripten/emscripten.h>
+extern uint8_t* g_vram;    // 64KB
+extern uint8_t* g_cram;    // 128B
+extern uint8_t* g_vsram;   // ~0x50
+extern uint8_t* g_vdp_regs;// ~0x20
+extern uint8_t* g_sat;     // 0x280
+EMSCRIPTEN_KEEPALIVE uint32_t _get_vram_ptr(void){ return (uint32_t)g_vram; }
+EMSCRIPTEN_KEEPALIVE uint32_t _get_cram_ptr(void){ return (uint32_t)g_cram; }
+EMSCRIPTEN_KEEPALIVE uint32_t _get_vsram_ptr(void){ return (uint32_t)g_vsram; }
+EMSCRIPTEN_KEEPALIVE uint32_t _get_vdp_regs_ptr(void){ return (uint32_t)g_vdp_regs; }
+EMSCRIPTEN_KEEPALIVE uint32_t _get_sat_ptr(void){ return (uint32_t)g_sat; }
+```
+
 #### 0.2 - Correção do Fluxo de Dados
 **Objetivo**: Corrigir erro "ROM nao disponivel para processamento"
 
