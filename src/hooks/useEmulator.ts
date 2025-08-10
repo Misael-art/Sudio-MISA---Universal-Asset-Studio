@@ -138,6 +138,13 @@ export function useEmulator(options: UseEmulatorOptions): UseEmulatorApi {
           // As fallback, use known MD default.
           // Keeping fixed for now; if needed, parse from DOM canvas size.
         }
+        // Fallback adicional: ler do canvas do emulador se existir
+        const mount = containerRef.current;
+        const canvas = mount?.querySelector('canvas') as HTMLCanvasElement | null;
+        if (canvas && canvas.width && canvas.height) {
+          width = canvas.width;
+          height = canvas.height;
+        }
       } catch {}
       let framebuffer: Uint8ClampedArray | undefined;
       if (typeof getFrameRef === 'function') {
