@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import type { FrameIR } from '@/emulation/ir';
+import type { MemorySnapshot } from '@/emulation/types';
 import PaletteViewer from '@/components/viewers/PaletteViewer';
 import TilemapViewer from '@/components/viewers/TilemapViewer';
 import SpriteViewer from '@/components/viewers/SpriteViewer';
@@ -15,9 +16,10 @@ import { useAssetsStore } from '@/state/assets';
 interface AnalyzerProps {
   frame?: FrameIR | null;
   captureState?: () => Promise<Uint8Array | null>;
+  snapshot?: MemorySnapshot | null;
 }
 
-export const Analyzer: React.FC<AnalyzerProps> = ({ frame, captureState }) => {
+export const Analyzer: React.FC<AnalyzerProps> = ({ frame, captureState, snapshot }) => {
   const hasData = !!frame;
   const firstLayer = useMemo(() => frame?.layers?.[0], [frame]);
   const diffCanvasRef = React.useRef<HTMLCanvasElement | null>(null);
@@ -125,14 +127,14 @@ export const Analyzer: React.FC<AnalyzerProps> = ({ frame, captureState }) => {
         {!hasData && <div className="text-gray-500">Nenhum frame disponível. Inicie a emulação.</div>}
       </div>
       <div>
-        <DiagnosticsPanel frame={frame} snapshot={{
-          vram: (frame as any)?.snapshot?.vram,
-          cram: (frame as any)?.snapshot?.cram,
-          vsram: (frame as any)?.snapshot?.vsram,
-          regs: (frame as any)?.snapshot?.regs,
-          width: frame?.framebuffer?.image?.width,
-          height: frame?.framebuffer?.image?.height,
-        }} />
+        <DiagnosticsPanel frame={frame} snapshot={snapshot ? {
+          vram: snapshot.vram,
+          cram: snapshot.cram,
+          vsram: snapshot.vsram,
+          regs: snapshot.regs,
+          width: snapshot.width,
+          height: snapshot.height,
+        } : undefined} />
         <div className="mt-4">
           <div className="text-sm text-gray-600 mb-1">Diff (FrameBuffer vs Reconstrução)</div>
           <canvas ref={diffCanvasRef} className="border rounded bg-white" />

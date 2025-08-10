@@ -440,22 +440,12 @@ export const MainInterface: React.FC = () => {
                 disabled: true
               },
               {
-                id: 'import-editor',
-                label: 'Importar/Editar',
-                icon: <Image className="w-5 h-5" />,
-                content: (
-                  <div className="p-4">
-                    <ImportEditor />
-                  </div>
-                )
-              },
-              {
                 id: 'analyzer',
                 label: 'Analisador',
                 icon: <BarChart3 className="w-5 h-5" />,
                 content: (
                   <div className="p-4">
-                    <Analyzer frame={frameIR} captureState={captureState} />
+                    <Analyzer frame={frameIR} captureState={captureState} snapshot={snapshot as any} />
                   </div>
                 )
               }
