@@ -81,7 +81,7 @@ export class MegaDriveAdapter {
   }
 
   private reconstructLayers(snapshot: MDMemorySnapshot, palettes: Palette[], tileset: Tileset, diagnostics?: string[]): Layer[] {
-    const vdp = parseVDPRegisters(snapshot.regs);
+    const vdp = parseVDPRegisters(snapshot.regs, snapshot.vsram);
     const width = 64, height = 32; // grids típicos para 320x224
     const layers: Layer[] = [];
 

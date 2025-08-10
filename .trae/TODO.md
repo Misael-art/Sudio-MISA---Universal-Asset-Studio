@@ -12,6 +12,8 @@
   - [ ] Atualizar `src/emulation/cores.ts` com os nomes definitivos caso diferenciem dos placeholders
   - [ ] Validar na UI (Analyzer → Exports do Core) que todos aparecem como “OK”
 
+  - [ ] Rebuild do core MD realizado e artefatos substituídos em `public/emulatorjs-data/cores/`
+
 - [ ] SNES (SNES9x port via EmulatorJS)
   - [ ] Expor `framebuffer`, `vram_ptr` (0x8000), `cgram_ptr` (0x200), `oam_ptr` (~0x220), `ppu_regs_ptr` (~0x40)
   - [ ] Atualizar `cores.ts` e validar na UI
