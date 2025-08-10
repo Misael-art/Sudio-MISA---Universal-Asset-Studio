@@ -167,15 +167,12 @@ export function useEmulator(options: UseEmulatorOptions): UseEmulatorApi {
       let cram = readRegion(coreDescriptor.exports?.cramPtr, coreDescriptor.sizes?.cram);
       let vsram = readRegion(coreDescriptor.exports?.vsramPtr, coreDescriptor.sizes?.vsram);
       let regs = readRegion(coreDescriptor.exports?.regsPtr, coreDescriptor.sizes?.regs);
-      let sat: Uint8Array | undefined;
-      if (vram) {
-        // Se o core não expuser ponteiro para SAT, derive pela base típica
-        // Em breve substituímos pelo registrador VDP real
+      // SAT: preferir ponteiro nativo; fallback para derivado via base típica
+      let sat = readRegion((coreDescriptor.exports as any)?.satPtr, coreDescriptor.sizes?.sat);
+      if (!sat && vram) {
         const satBase = 0xD800;
         const satSize = 0x280;
-        if (satBase + satSize <= vram.length) {
-          sat = vram.slice(satBase, satBase + satSize);
-        }
+        if (satBase + satSize <= vram.length) sat = vram.slice(satBase, satBase + satSize);
       }
 
       // Fallback por SaveState (uma tentativa) caso não tenhamos regiões essenciais
