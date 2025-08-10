@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test</title>
+</head>
+<body>
+    <h1>Test Page</h1>
+    <script>
+        console.log('Test script working');
+        
+        // Test worker creation
+        try {
+            const worker = new Worker('/workers/emulation.worker.js');
+            console.log('Worker created successfully');
+            
+            worker.onerror = (error) => {
+                console.error('Worker error:', error);
+            };
+            
+            worker.onmessage = (event) => {
+                console.log('Worker message:', event.data);
+            };
+            
+        } catch (error) {
+            console.error('Failed to create worker:', error);
+        }
+    </script>
+</body>
+</html>

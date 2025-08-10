@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Worker</title>
+</head>
+<body>
+    <h1>Teste de Debug do Worker</h1>
+    <div id="log"></div>
+    
+    <script>
+        const log = document.getElementById('log');
+        
+        function addLog(message) {
+            const p = document.createElement('p');
+            p.textContent = new Date().toLocaleTimeString() + ': ' + message;
+            log.appendChild(p);
+        }
+        
+        try {
+            addLog('Tentando criar worker...');
+            const worker = new Worker('/workers/emulation.worker.js');
+            
+            worker.onmessage = function(e) {
+                addLog('Mensagem recebida: ' + JSON.stringify(e.data));
+            };
+            
+            worker.onerror = function(error) {
+                addLog('Erro no worker: ' + error.message);
+            };
+            
+            addLog('Worker criado com sucesso');
+            
+            // Testar envio de mensagem
+            worker.postMessage({ type: 'init' });
+            addLog('Mensagem de init enviada');
+            
+        } catch (error) {
+            addLog('Erro ao criar worker: ' + error.message);
+        }
+    </script>
+</body>
+</html>

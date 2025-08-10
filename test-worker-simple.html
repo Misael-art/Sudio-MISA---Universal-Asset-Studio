@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Worker Simple</title>
+</head>
+<body>
+    <h1>Worker Test Simple</h1>
+    <div id="output"></div>
+    
+    <script type="module">
+        const output = document.getElementById('output');
+        
+        function log(message) {
+            const div = document.createElement('div');
+            div.textContent = new Date().toLocaleTimeString() + ': ' + message;
+            output.appendChild(div);
+            console.log(message);
+        }
+        
+        try {
+            log('Tentando criar worker...');
+            
+            // Criar worker usando a mesma sintaxe do Vite
+            const worker = new Worker(
+                new URL('./src/workers/emulation.worker.ts', import.meta.url),
+                { type: 'module' }
+            );
+            
+            log('Worker criado com sucesso');
+            
+            // Manipulador de erro
+            worker.onerror = (error) => {
+                log('ERRO NO WORKER: ' + (error.message || 'Erro desconhecido'));
+                console.error('Erro detalhado:', error);
+            };
+            
+            // Manipulador de mensagem
+            worker.onmessage = (event) => {
+                log('Mensagem do worker: ' + JSON.stringify(event.data));
+            };
+            
+            // Testar envio de mensagem simples
+            setTimeout(() => {
+                log('Enviando mensagem de teste...');
+                worker.postMessage({
+                    type: 'LOAD_ROM',
+                    payload: {
+                        romData: new Uint8Array([1, 2, 3, 4]), // Dados de teste
+                        system: 'megadrive'
+                    }
+                });
+            }, 1000);
+            
+        } catch (error) {
+            log('ERRO NA CRIAÇÃO: ' + error.message);
+            console.error('Erro detalhado:', error);
+        }
+    </script>
+</body>

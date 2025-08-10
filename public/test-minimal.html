@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Mínimo - Sintaxe JavaScript</title>
+</head>
+<body>
+    <h1>Teste Mínimo de Sintaxe</h1>
+    <div id="output"></div>
+    
+    <script>
+        console.log('Iniciando teste mínimo');
+        
+        // Teste básico de sintaxe
+        function testBasic() {
+            console.log('Função básica OK');
+            return true;
+        }
+        
+        // Teste de arrow function
+        const testArrow = () => {
+            console.log('Arrow function OK');
+        };
+        
+        // Teste de objeto
+        const obj = {
+            prop: 'valor',
+            method() {
+                console.log('Método do objeto OK');
+            }
+        };
+        
+        // Teste de template literal
+        const message = `Template literal OK: ${new Date()}`;
+        
+        // Executar testes
+        try {
+            testBasic();
+            testArrow();
+            obj.method();
+            console.log(message);
+            
+            document.getElementById('output').innerHTML = '<p style="color: green;">Todos os testes de sintaxe passaram!</p>';
+        } catch (error) {
+            console.error('Erro de sintaxe:', error);
+            document.getElementById('output').innerHTML = `<p style="color: red;">Erro: ${error.message}</p>`;
+        }
+    </script>
+</body>
+</html>

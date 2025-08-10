@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Isolado - Sem Vite/React</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Teste Isolado - Verificação de Sintaxe JavaScript</h1>
+        <p>Este teste verifica se há problemas de sintaxe JavaScript básicos.</p>
+        
+        <button onclick="testBasicJS()">Testar JavaScript Básico</button>
+        <button onclick="testWorker()">Testar Worker</button>
+        <button onclick="clearLog()">Limpar Log</button>
+        
+        <div id="log" class="log">Log iniciado...\n</div>
+    </div>
+
+    <script>
+        function log(message) {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+        }
+
+        function clearLog() {
+            document.getElementById('log').textContent = 'Log limpo...\n';
+        }
+
+        function testBasicJS() {
+            try {
+                log('Testando JavaScript básico...');
+                
+                // Teste de sintaxe básica
+                const obj = { a: 1, b: 2 };
+                const arr = [1, 2, 3];
+                const func = () => 'arrow function';
+                
+                log('✅ Objetos, arrays e arrow functions OK');
+                
+                // Teste de template literals
+                const template = `Template literal: ${obj.a + obj.b}`;
+                log(`✅ Template literals OK: ${template}`);
+                
+                // Teste de destructuring
+                const { a, b } = obj;
+                const [first, ...rest] = arr;
+                log(`✅ Destructuring OK: a=${a}, b=${b}, first=${first}`);
+                
+                log('✅ Todos os testes de JavaScript básico passaram!');
+                
+            } catch (error) {
+                log(`❌ Erro no JavaScript básico: ${error.message}`);
+                console.error('Erro detalhado:', error);
+            }
+        }
+
+        function testWorker() {
+            try {
+                log('Testando Web Worker...');
+                
+                const worker = new Worker('/workers/emulation.worker.js');
+                
+                worker.onmessage = function(event) {
+                    log(`📨 Mensagem do worker: ${JSON.stringify(event.data)}`);
+                };
+                
+                worker.onerror = function(error) {
+                    log(`❌ Erro no worker: ${error.message}`);
+                    console.error('Erro detalhado do worker:', error);
+                };
+                
+                worker.postMessage({ type: 'init', payload: {} });
+                log('✅ Worker criado e mensagem enviada');
+                
+            } catch (error) {
+                log(`❌ Erro ao criar worker: ${error.message}`);
+                console.error('Erro detalhado:', error);
+            }
+        }
+
+        // Teste automático ao carregar
+        window.addEventListener('load', function() {
+            log('Página carregada com sucesso');
+            log('Testando sintaxe JavaScript automaticamente...');
+            testBasicJS();
+        });
+
+        // Capturar erros globais
+        window.addEventListener('error', function(event) {
+            log(`❌ Erro global capturado: ${event.error.message}`);
+            log(`   Arquivo: ${event.filename}:${event.lineno}:${event.colno}`);
+            console.error('Erro global detalhado:', event.error);
+        });
+
+        window.addEventListener('unhandledrejection', function(event) {
+            log(`❌ Promise rejeitada: ${event.reason}`);
+            console.error('Promise rejeitada detalhada:', event.reason);
+        });
+    </script>
+</body>
+</html>

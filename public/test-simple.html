@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Simple</title>
+</head>
+<body>
+    <h1>Test Page</h1>
+    <p>This is a simple test page</p>
+    <script>
+        console.log('Simple test script working');
+        
+        // Test basic JavaScript
+        function testFunction() {
+            console.log('Function working');
+            return true;
+        }
+        
+        testFunction();
+        
+        // Test worker creation
+        try {
+            const worker = new Worker('/workers/emulation.worker.js');
+            console.log('Worker created successfully');
+            
+            worker.onmessage = function(e) {
+                console.log('Worker message:', e.data);
+            };
+            
+            worker.onerror = function(error) {
+                console.error('Worker error:', error);
+            };
+            
+            // Test worker communication
+            worker.postMessage({
+                type: 'LOAD_ROM',
+                payload: {
+                    romData: new Uint8Array([1, 2, 3, 4]),
+                    system: 'megadrive'
+                }
+            });
+            
+        } catch (error) {
+            console.error('Error creating worker:', error);
+        }
+    </script>
+</body>
+</html>
