@@ -82,8 +82,8 @@
   - [ ] Integração (snapshot→IR→render→diff) com thresholds por sistema
 
 ## Documentação
-- [ ] Atualizar @documents com a fase corrente e instruções para habilitar exports no core
-- [ ] Citar símbolos esperados por sistema e tamanhos de memória (ref. `cores.ts`)
+- [x] Atualizar @documents com a fase corrente e instruções para habilitar exports no core
+- [x] Citar símbolos esperados por sistema e tamanhos de memória (ref. `cores.ts`)
 
 - [x] 1: Baixar e configurar EmulatorJS/Genesis Plus GX localmente na pasta /public (priority: High)
 - [x] 2: Modificar megadrive.worker.ts para usar o emulador real em vez do generateTestFrame (priority: High)
