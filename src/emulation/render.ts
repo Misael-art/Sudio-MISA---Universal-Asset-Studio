@@ -1,4 +1,4 @@
-import type { FrameIR, Layer, Tilemap, Tileset, Sprite } from '@/emulation/ir';
+import type { FrameIR, Layer, Tilemap, Tileset, Sprite, TilemapCell } from '@/emulation/ir';
 
 function createImageData(width: number, height: number): ImageData {
   return new ImageData(width, height);
@@ -57,7 +57,12 @@ function colorizeIndexedTile(
   }
 }
 
-function drawTilemap(dst: ImageData, layer: Layer, frame: FrameIR): void {
+function drawTilemap(
+  dst: ImageData,
+  layer: Layer,
+  frame: FrameIR,
+  cellFilter?: (cell: TilemapCell) => boolean
+): void {
   const map: Tilemap = layer.tilemap;
   const tileset: Tileset = layer.tileset;
   const tw = tileset.tileSize.width;
@@ -75,6 +80,7 @@ function drawTilemap(dst: ImageData, layer: Layer, frame: FrameIR): void {
   for (let ty = 0; ty < H; ty++) {
     for (let tx = 0; tx < W; tx++) {
       const cell = map.cells[ty * W + tx];
+      if (cellFilter && !cellFilter(cell)) continue;
       const tile = tileset.tiles[cell.tileIndex];
       if (!tile) continue;
       // posição destino com scroll e wrap
@@ -160,15 +166,19 @@ export function renderFrameIRToImage(frame: FrameIR, width?: number, height?: nu
     const indices = options?.layerIndices && options.layerIndices.length > 0
       ? options.layerIndices
       : [0];
-    for (const idx of indices) {
-      if (idx >= 0 && idx < frame.layers.length) {
-        drawTilemap(out, frame.layers[idx], frame);
-      }
+    // Ordenar por prioridade declarada, manter pipeline de prioridade por célula
+    const orderedLayers = indices
+      .filter(idx => idx >= 0 && idx < frame.layers.length)
+      .map(idx => frame.layers[idx])
+      .sort((a, b) => (a.priorityOrder ?? 0) - (b.priorityOrder ?? 0));
+    // 1) BG low-priority cells
+    for (const layer of orderedLayers) drawTilemap(out, layer, frame, (cell) => cell.priority !== true);
+    // 2) Sprites desenhados depois dos BG low
+    if (frame.sprites && frame.sprites.length > 0) {
+      drawSprites(out, frame.sprites);
     }
-  }
-  // Draw sprites on top
-  if (frame.sprites && frame.sprites.length > 0) {
-    drawSprites(out, frame.sprites);
+    // 3) BG high-priority cells acima dos sprites
+    for (const layer of orderedLayers) drawTilemap(out, layer, frame, (cell) => cell.priority === true);
   }
   return out;
 }

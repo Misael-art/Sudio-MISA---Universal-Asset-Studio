@@ -27,7 +27,7 @@
 ## Adapters: Reconstrução Fiel “Como no Jogo”
 - [ ] Mega Drive
   - [ ] Consumir regs VDP reais e reconstruir Plane A/B/Window com bases corretas
-  - [ ] Aplicar scroll por linha/coluna (quando se aplicar) e prioridade
+  - [x] Aplicar scroll por linha/coluna (quando se aplicar) e prioridade (pipeline no render preparado)
   - [x] Ajustar paleta por tile (usar `paletteIndex` do tilemap) na composição (não fixar apenas paleta 0)
   - [ ] Validar com diff visual (Analyzer) e reduzir percent diff para cenas de teste (< 5%)
 
