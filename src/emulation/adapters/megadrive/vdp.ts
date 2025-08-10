@@ -9,12 +9,14 @@ export interface VDPRegisters {
   modeSet2?: number;
   scrollMode?: { h: 'full' | 'cell' | 'line'; v: 'full' | 'cell'; };
   hScrollTableBase?: number;
+  planeASize?: { widthTiles: number; heightTiles: number };
+  planeBSize?: { widthTiles: number; heightTiles: number };
 }
 
 export function parseVDPRegisters(regs?: Uint8Array, vsram?: Uint8Array): VDPRegisters {
   // Se disponível, parse simples dos registradores do VDP; caso contrário, defaults
   if (!regs || regs.length < 0x20) {
-    return {
+    const def = {
       planeABase: 0xC000,
       planeBBase: 0xE000,
       windowBase: 0xB000,
@@ -25,7 +27,10 @@ export function parseVDPRegisters(regs?: Uint8Array, vsram?: Uint8Array): VDPReg
       modeSet2: 0,
       scrollMode: { h: 'full', v: 'full' },
       hScrollTableBase: 0,
-    };
+      planeASize: { widthTiles: 64, heightTiles: 32 },
+      planeBSize: { widthTiles: 64, heightTiles: 32 },
+    } as VDPRegisters;
+    return def;
   }
   // Exemplo: VDP regs layout (parcial e simplificado)
   const r2 = regs[2]; // Name table A base (bits relevantes) — simplificado
@@ -36,6 +41,7 @@ export function parseVDPRegisters(regs?: Uint8Array, vsram?: Uint8Array): VDPReg
   const r1 = regs[1];
   const r11 = regs[11]; // Scroll mode
   const r13 = regs[13]; // HScroll table base
+  const r16 = regs[16]; // Plane sizes (simplificado)
   const planeABase = (r2 & 0x38) << 10; // mapeamento simplificado
   const planeBBase = (r4 & 0x07) << 13;
   const windowBase = (r3 & 0x3E) << 10;
@@ -49,6 +55,19 @@ export function parseVDPRegisters(regs?: Uint8Array, vsram?: Uint8Array): VDPReg
   const hScrollTableBase = (r13 & 0x3F) << 10;
   // vScroll (plano) básico via VSRAM primeira palavra
   const vScroll = ((vsram?.[0] ?? 0) | ((vsram?.[1] ?? 0) << 8)) & 0x3FF;
+  // Tamanho dos planos (simplificado):
+  // bits 0-1: Plane A, bits 4-5: Plane B
+  const sizeBitsToWH = (bits: number) => {
+    switch (bits & 0x3) {
+      case 0: return { widthTiles: 32, heightTiles: 32 };
+      case 1: return { widthTiles: 64, heightTiles: 32 };
+      case 2: return { widthTiles: 32, heightTiles: 64 };
+      case 3: return { widthTiles: 64, heightTiles: 64 };
+      default: return { widthTiles: 64, heightTiles: 32 };
+    }
+  };
+  const planeASize = sizeBitsToWH(r16 & 0x3);
+  const planeBSize = sizeBitsToWH((r16 >> 4) & 0x3);
   return {
     planeABase,
     planeBBase,
@@ -60,6 +79,8 @@ export function parseVDPRegisters(regs?: Uint8Array, vsram?: Uint8Array): VDPReg
     modeSet2: r1,
     scrollMode: { h, v },
     hScrollTableBase,
+    planeASize,
+    planeBSize,
   };
 }
 

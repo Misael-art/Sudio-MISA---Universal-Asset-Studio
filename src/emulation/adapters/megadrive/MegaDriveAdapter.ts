@@ -82,7 +82,8 @@ export class MegaDriveAdapter {
 
   private reconstructLayers(snapshot: MDMemorySnapshot, palettes: Palette[], tileset: Tileset, diagnostics?: string[]): Layer[] {
     const vdp = parseVDPRegisters(snapshot.regs, snapshot.vsram);
-    const width = 64, height = 32; // grids típicos para 320x224
+    const width = vdp.planeASize?.widthTiles ?? 64;
+    const height = vdp.planeASize?.heightTiles ?? 32;
     const layers: Layer[] = [];
 
     // Plane A
@@ -102,7 +103,9 @@ export class MegaDriveAdapter {
 
     // Plane B
     if (snapshot.vram && typeof vdp.planeBBase === 'number') {
-      const tmB = this.reconstructTilemapFromVRAM(snapshot.vram, vdp.planeBBase, width, height, diagnostics);
+      const widthB = vdp.planeBSize?.widthTiles ?? width;
+      const heightB = vdp.planeBSize?.heightTiles ?? height;
+      const tmB = this.reconstructTilemapFromVRAM(snapshot.vram, vdp.planeBBase, widthB, heightB, diagnostics);
       const lineScrollX = this.computeLineScrollX(snapshot.vram, vdp, snapshot.height || this.height, diagnostics);
       const columnScrollY = this.computeColumnScrollY(snapshot.vsram, diagnostics);
       layers.push({ kind: 'BG', tileset, tilemap: tmB, paletteGroup: [0], scroll: { x: 0, y: 0 }, lineScrollX, columnScrollY, priorityOrder: 1 });
