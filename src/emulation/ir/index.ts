@@ -45,6 +45,9 @@ export interface Layer {
   tilemap: Tilemap;
   paletteGroup: number[]; // índices das paletas usadas
   scroll?: { x: number; y: number };
+  // MD: suporte a scroll por linha/coluna quando disponível
+  lineScrollX?: number[]; // por scanline (pixels)
+  columnScrollY?: number[]; // por coluna (em pixels)
   priorityOrder?: number; // ordem de composição
 }
 

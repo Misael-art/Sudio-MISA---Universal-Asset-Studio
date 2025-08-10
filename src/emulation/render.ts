@@ -70,8 +70,8 @@ function drawTilemap(
   const W = map.width;
   const H = map.height;
   const palettes = frame.palettes;
-  const scrollX = Math.trunc(layer.scroll?.x ?? 0);
-  const scrollY = Math.trunc(layer.scroll?.y ?? 0);
+  const scrollXFull = Math.trunc(layer.scroll?.x ?? 0);
+  const scrollYFull = Math.trunc(layer.scroll?.y ?? 0);
   const viewportW = dst.width;
   const viewportH = dst.height;
   const mapPixW = W * tw;
@@ -84,8 +84,21 @@ function drawTilemap(
       const tile = tileset.tiles[cell.tileIndex];
       if (!tile) continue;
       // posição destino com scroll e wrap
-      const baseDx = tx * tw - norm(scrollX, mapPixW);
-      const baseDy = ty * th - norm(scrollY, mapPixH);
+      // Scroll por linha/coluna (se disponível) — aplica offset adicional
+      let sx = scrollXFull;
+      let sy = scrollYFull;
+      if (layer.lineScrollX) {
+        const startY = ty * th;
+        // Seleciona o valor da primeira linha do tile (aproximação)
+        sx = Math.trunc(layer.lineScrollX[Math.min(startY, layer.lineScrollX.length - 1)] ?? scrollXFull);
+      }
+      if (layer.columnScrollY) {
+        const startX = tx * tw;
+        const col = Math.floor(startX / tw);
+        sy = Math.trunc(layer.columnScrollY[Math.min(col, layer.columnScrollY.length - 1)] ?? scrollYFull);
+      }
+      const baseDx = tx * tw - norm(sx, mapPixW);
+      const baseDy = ty * th - norm(sy, mapPixH);
       const targets = [
         { dx: baseDx, dy: baseDy },
         { dx: baseDx + mapPixW, dy: baseDy },
