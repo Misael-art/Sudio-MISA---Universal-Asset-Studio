@@ -65,11 +65,32 @@ function drawTilemap(dst: ImageData, layer: Layer, frame: FrameIR): void {
   const W = map.width;
   const H = map.height;
   const palettes = frame.palettes;
+  const scrollX = Math.trunc(layer.scroll?.x ?? 0);
+  const scrollY = Math.trunc(layer.scroll?.y ?? 0);
+  const viewportW = dst.width;
+  const viewportH = dst.height;
+  const mapPixW = W * tw;
+  const mapPixH = H * th;
+  const norm = (v: number, m: number) => ((v % m) + m) % m;
   for (let ty = 0; ty < H; ty++) {
     for (let tx = 0; tx < W; tx++) {
       const cell = map.cells[ty * W + tx];
       const tile = tileset.tiles[cell.tileIndex];
       if (!tile) continue;
+      // posição destino com scroll e wrap
+      const baseDx = tx * tw - norm(scrollX, mapPixW);
+      const baseDy = ty * th - norm(scrollY, mapPixH);
+      const targets = [
+        { dx: baseDx, dy: baseDy },
+        { dx: baseDx + mapPixW, dy: baseDy },
+        { dx: baseDx - mapPixW, dy: baseDy },
+        { dx: baseDx, dy: baseDy + mapPixH },
+        { dx: baseDx, dy: baseDy - mapPixH },
+        { dx: baseDx + mapPixW, dy: baseDy + mapPixH },
+        { dx: baseDx - mapPixW, dy: baseDy - mapPixH },
+        { dx: baseDx + mapPixW, dy: baseDy - mapPixH },
+        { dx: baseDx - mapPixW, dy: baseDy + mapPixH },
+      ];
       // Se tivermos índices, aplicamos paleta por tile dinamicamente
       if (tile.pixelIndices && palettes && palettes.length > 0) {
         // MD: paletteIndex seleciona uma das paletas de 16 cores
@@ -85,7 +106,10 @@ function drawTilemap(dst: ImageData, layer: Layer, frame: FrameIR): void {
             flipped[y * srcW + x] = tile.pixelIndices[sy * srcW + sx];
           }
         }
-        colorizeIndexedTile(dst, flipped, tx * tw, ty * th, tw, th, palette);
+        for (const t of targets) {
+          if (t.dx + tw < 0 || t.dx >= viewportW || t.dy + th < 0 || t.dy >= viewportH) continue;
+          colorizeIndexedTile(dst, flipped, t.dx, t.dy, tw, th, palette);
+        }
       } else {
         // fallback: já colorizado em imageData
         // Handle flips por cópia para buffer temporário
@@ -107,7 +131,10 @@ function drawTilemap(dst: ImageData, layer: Layer, frame: FrameIR): void {
           }
           src = tmp;
         }
-        blitImageData(dst, src, tx * tw, ty * th);
+        for (const t of targets) {
+          if (t.dx + tw < 0 || t.dx >= viewportW || t.dy + th < 0 || t.dy >= viewportH) continue;
+          blitImageData(dst, src, t.dx, t.dy);
+        }
       }
     }
   }
