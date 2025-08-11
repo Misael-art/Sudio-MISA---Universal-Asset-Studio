@@ -141,15 +141,8 @@
           S('status').textContent = 'Iniciando...';
           loadStart = performance.now();
           await ensureEmulatorClass();
-          if (!window.EJS_emulator) {
-            window.EJS_emulator = new window.EmulatorJS(window.EJS_player, {
-              dataPath: window.EJS_pathtodata,
-              system: window.EJS_core,
-              startOnLoad: window.EJS_startOnLoaded,
-              threads: window.EJS_threads,
-              forceLegacyCores: window.EJS_forceLegacyCores,
-            });
-          }
+          // loader.js já instancia e popula window.EJS_emulator automaticamente
+          if (!window.EJS_emulator) throw new Error('EJS_emulator não foi inicializado pelo loader');
           const ejs = window.EJS_emulator;
           setupListeners(ejs);
 
