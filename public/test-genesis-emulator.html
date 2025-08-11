@@ -124,25 +124,48 @@
         });
       }
 
-      function ensureEmulatorClass(){
-        return new Promise((resolve,reject)=>{
-          if (typeof window.EmulatorJS === 'function') return resolve();
+      async function ensureEmulatorClass(){
+        if (typeof window.EmulatorJS === 'function') return 'class-ready';
+        // 1) Tentar via loader.js (caminho padrão de produção)
+        await new Promise((resolve,reject)=>{
           const s = document.createElement('script');
           s.src = window.EJS_pathtodata + 'loader.js';
           s.async = true;
-          s.onload = () => resolve();
-          s.onerror = (e) => reject(new Error('Falha ao carregar loader.js'));
+          s.onload = () => resolve(null);
+          s.onerror = () => resolve(null); // segue para fallback
           document.head.appendChild(s);
         });
+        // aguardar EJS_emulator nascer
+        for (let i=0;i<40;i++){ if (window.EJS_emulator) return 'loader'; await new Promise(r=>setTimeout(r,50)); }
+        // 2) Fallback: carregar emulator.min.js direto e instanciar manualmente
+        await new Promise((resolve)=>{
+          const s = document.createElement('script');
+          s.src = window.EJS_pathtodata + 'emulator.min.js';
+          s.async = true;
+          s.onload = resolve;
+          s.onerror = resolve;
+          document.head.appendChild(s);
+        });
+        if (typeof window.EmulatorJS === 'function') return 'manual';
+        throw new Error('EmulatorJS não carregado');
       }
 
       async function startWithRom(file){
         try {
           S('status').textContent = 'Iniciando...';
           loadStart = performance.now();
-          await ensureEmulatorClass();
-          // loader.js já instancia e popula window.EJS_emulator automaticamente
-          if (!window.EJS_emulator) throw new Error('EJS_emulator não foi inicializado pelo loader');
+          const mode = await ensureEmulatorClass();
+          if (!window.EJS_emulator && mode === 'manual') {
+            // Instanciar manualmente quando sem loader
+            window.EJS_emulator = new window.EmulatorJS(window.EJS_player, {
+              dataPath: window.EJS_pathtodata,
+              system: window.EJS_core,
+              startOnLoad: window.EJS_startOnLoaded,
+              threads: window.EJS_threads,
+              forceLegacyCores: window.EJS_forceLegacyCores,
+            });
+          }
+          if (!window.EJS_emulator) throw new Error('EJS_emulator não foi inicializado (loader e fallback falharam)');
           const ejs = window.EJS_emulator;
           setupListeners(ejs);
 
