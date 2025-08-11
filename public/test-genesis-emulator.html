@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Teste Genesis Plus GX - Exports e Métricas</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#0b1020; color:#e5e7eb; }
+    .wrap { max-width: 960px; margin: 24px auto; padding: 16px; }
+    .row { display:flex; gap:16px; align-items:center; }
+    .box { background:#111827; border:1px solid #374151; border-radius:8px; padding:16px; margin-top:16px; }
+    .good { color:#10b981; }
+    .bad { color:#ef4444; }
+    .muted { color:#9ca3af; font-size:12px; }
+    #emulator-mount { width:640px; height:480px; background:#000; border:1px solid #374151; border-radius:6px; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid #374151; padding: 8px; text-align:left; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Teste Genesis Plus GX — Exports e Métricas</h1>
+    <div class="row box">
+      <input id="rom" type="file" accept=".bin,.smd,.gen,.md" />
+      <button id="startBtn">Iniciar</button>
+      <span id="status" class="muted">Aguardando ROM...</span>
+    </div>
+
+    <div class="row box">
+      <div id="emulator-mount"></div>
+      <div style="flex:1">
+        <h3>Métricas</h3>
+        <table>
+          <tbody>
+            <tr><th>Boot total (ms)</th><td id="bootMs">-</td></tr>
+            <tr><th>Latência 1º framebuffer (ms)</th><td id="ffbMs">-</td></tr>
+            <tr><th>Module pronto</th><td id="modReady">-</td></tr>
+            <tr><th>saveDatabaseLoaded</th><td id="fsReady">-</td></tr>
+            <tr><th>start</th><td id="started">-</td></tr>
+          </tbody>
+        </table>
+        <h3>Exports</h3>
+        <table>
+          <tbody>
+            <tr><th>_get_frame_buffer_ref</th><td id="exp_fb">-</td></tr>
+            <tr><th>_get_vram_ptr</th><td id="exp_vram">-</td></tr>
+            <tr><th>_get_cram_ptr</th><td id="exp_cram">-</td></tr>
+            <tr><th>_get_vsram_ptr</th><td id="exp_vsram">-</td></tr>
+            <tr><th>_get_sat_ptr</th><td id="exp_sat">-</td></tr>
+            <tr><th>_get_vdp_regs_ptr</th><td id="exp_regs">-</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <pre class="box" id="log" style="white-space:pre-wrap"></pre>
+  </div>
+
+  <script>
+    (function(){
+      const S = (id) => document.getElementById(id);
+      const log = (...args) => {
+        const line = args.map(a => typeof a==='string'? a : JSON.stringify(a)).join(' ');
+        S('log').textContent += line + '\n';
+        console.log('[TEST]', ...args);
+      };
+
+      // Configurar EJS (sem modo debug)
+      window.EJS_player = '#emulator-mount';
+      window.EJS_core = 'segaMD';
+      window.EJS_pathtodata = '/emulatorjs-data/';
+      window.EJS_startOnLoaded = false;
+      window.EJS_threads = 'disabled';
+      window.EJS_forceLegacyCores = true;
+
+      let loadStart = 0, moduleReadyAt = 0, startAt = 0, firstFbAt = 0;
+
+      function paintMetrics() {
+        if (moduleReadyAt && startAt) S('bootMs').textContent = Math.round(startAt - loadStart);
+        if (moduleReadyAt && firstFbAt) S('ffbMs').textContent = Math.round(firstFbAt - loadStart);
+        S('modReady').textContent = moduleReadyAt ? new Date(moduleReadyAt).toLocaleTimeString() : '-';
+        S('started').textContent = startAt ? new Date(startAt).toLocaleTimeString() : '-';
+      }
+
+      function wrapExportsProbe(gm) {
+        try {
+          const mod = gm.Module;
+          const cwrap = mod && typeof mod.cwrap === 'function' ? mod.cwrap.bind(mod) : null;
+          const probe = (name) => {
+            try {
+              const fn = (mod && typeof mod[name] === 'function') ? mod[name] : (cwrap ? cwrap(name, 'number', []) : null);
+              const ok = typeof fn === 'function';
+              return ok;
+            } catch { return false; }
+          };
+          const set = (id,val) => { S(id).innerHTML = val ? '<span class="good">OK</span>' : '<span class="bad">FALTA</span>'; };
+          set('exp_fb',  probe('_get_frame_buffer_ref') || probe('get_frame_buffer_ref'));
+          set('exp_vram',probe('_get_vram_ptr') || probe('get_vram_ptr'));
+          set('exp_cram',probe('_get_cram_ptr') || probe('get_cram_ptr'));
+          set('exp_vsram',probe('_get_vsram_ptr') || probe('get_vsram_ptr'));
+          set('exp_sat', probe('_get_sat_ptr') || probe('get_sat_ptr'));
+          set('exp_regs',probe('_get_vdp_regs_ptr') || probe('get_vdp_regs_ptr'));
+        } catch (e) {
+          log('Probe error:', e);
+        }
+      }
+
+      function setupListeners(ejs) {
+        ejs.on('ready', () => {
+          log('ready');
+        });
+        ejs.on('saveDatabaseLoaded', () => {
+          log('saveDatabaseLoaded');
+          S('fsReady').textContent = new Date().toLocaleTimeString();
+        });
+        ejs.on('start', () => {
+          startAt = performance.now();
+          paintMetrics();
+          log('start');
+        });
+        ejs.on('error', (err) => {
+          log('EJS error', err?.message || err);
+          S('status').textContent = 'Erro: ' + (err?.message || err);
+        });
+      }
+
+      function ensureEmulatorClass(){
+        return new Promise((resolve,reject)=>{
+          if (typeof window.EmulatorJS === 'function') return resolve();
+          const s = document.createElement('script');
+          s.src = window.EJS_pathtodata + 'loader.js';
+          s.async = true;
+          s.onload = () => resolve();
+          s.onerror = (e) => reject(new Error('Falha ao carregar loader.js'));
+          document.head.appendChild(s);
+        });
+      }
+
+      async function startWithRom(file){
+        try {
+          S('status').textContent = 'Iniciando...';
+          loadStart = performance.now();
+          await ensureEmulatorClass();
+          if (!window.EJS_emulator) {
+            window.EJS_emulator = new window.EmulatorJS(window.EJS_player, {
+              dataPath: window.EJS_pathtodata,
+              system: window.EJS_core,
+              startOnLoad: window.EJS_startOnLoaded,
+              threads: window.EJS_threads,
+              forceLegacyCores: window.EJS_forceLegacyCores,
+            });
+          }
+          const ejs = window.EJS_emulator;
+          setupListeners(ejs);
+
+          const blobUrl = URL.createObjectURL(file);
+          window.EJS_gameUrl = blobUrl;
+          ejs.config.gameUrl = blobUrl;
+          ejs.config.gameName = file.name;
+
+          ejs.createText();
+          const maybe = ejs.downloadGameCore?.();
+          if (maybe && typeof maybe.then === 'function') await maybe;
+
+          let tries = 0;
+          while (!ejs.Module && tries < 200) { await new Promise(r=>setTimeout(r,100)); tries++; }
+          if (!ejs.Module) throw new Error('Module não disponível');
+          moduleReadyAt = performance.now();
+          paintMetrics();
+
+          if (!ejs.gameManager) ejs.downloadFiles?.();
+
+          // framebuffer polling simples
+          const tick = () => {
+            try {
+              const gm = ejs.gameManager; if (!gm) return requestAnimationFrame(tick);
+              const mount = document.querySelector('#emulator-mount');
+              const canvas = mount?.querySelector('canvas');
+              if (canvas && canvas.width && !firstFbAt) {
+                firstFbAt = performance.now();
+                paintMetrics();
+                wrapExportsProbe(gm);
+              }
+            } catch {}
+            requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+
+          S('status').textContent = 'Rodando...';
+        } catch (err) {
+          log('Erro ao iniciar:', err);
+          S('status').textContent = 'Erro ao iniciar: ' + (err?.message||err);
+        }
+      }
+
+      S('startBtn').addEventListener('click', () => {
+        const f = S('rom').files?.[0];
+        if (!f) { S('status').textContent = 'Selecione uma ROM'; return; }
+        startWithRom(f);
+      });
+    })();
+  </script>
+</body>
+</html>
+
