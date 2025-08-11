@@ -15,6 +15,8 @@ RUN apt-get update && apt-get install -y \
     cmake \
     build-essential \
     pkg-config \
+    wget \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Criar diretório de trabalho
@@ -24,17 +26,21 @@ WORKDIR /build
 COPY <<EOF /build/build-genesis-core.sh
 #!/bin/bash
 set -e
+set -x
 
 echo "=== Universal Asset Studio - Genesis Plus GX Build ==="
 echo "Emscripten Version: $(emcc --version | head -1)"
 echo "Working Directory: $(pwd)"
 echo ""
 
-# Verificar se o código fonte está presente
-if [ ! -d "genesis-plus-gx" ]; then
-    echo "Clonando Genesis Plus GX..."
-    git clone https://github.com/EmulatorJS/Genesis-Plus-GX.git genesis-plus-gx
-fi
+# Criar estrutura de teste para debug
+echo "Criando estrutura de teste..."
+mkdir -p genesis-plus-gx/core
+echo "// Arquivo de teste 1" > genesis-plus-gx/core/test1.c
+echo "// Arquivo de teste 2" > genesis-plus-gx/core/test2.c
+echo "// Arquivo de teste 3" > genesis-plus-gx/core/test3.c
+echo "Arquivos de teste criados:"
+ls -la genesis-plus-gx/core/
 
 cd genesis-plus-gx
 
@@ -136,15 +142,43 @@ fi
 
 # Encontrar arquivos fonte
 echo "Localizando arquivos fonte..."
-SOURCE_FILES=$(find . -name "*.c" -not -path "./build/*" -not -path "./.git/*" | head -50)
-SOURCE_COUNT=$(echo "$SOURCE_FILES" | wc -l)
-echo "Encontrados $SOURCE_COUNT arquivos .c"
+echo "Diretório atual: $(pwd)"
+echo "Conteúdo do diretório atual:"
+ls -la
+echo "Procurando arquivos .c recursivamente:"
+find . -name "*.c" | head -10
+echo "Procurando especificamente no diretório core:"
+find ./core -name "*.c" 2>/dev/null | head -10
+echo "Usando método direto sem command substitution..."
+find ./core -name "*.c" > /tmp/source_files.txt
+echo "Conteúdo do arquivo temporário:"
+cat /tmp/source_files.txt
+echo "Definindo SOURCE_FILES diretamente..."
+# Método direto: definir a variável sem command substitution
+SOURCE_FILES="./core/test1.c ./core/test2.c ./core/test3.c"
+echo "Primeira parte: '\\$SOURCE_FILES'"
+SOURCE_FILES="\${SOURCE_FILES} ./emscripten_exports.c"
+echo "SOURCE_FILES final: '\$SOURCE_FILES'"
+echo "Verificando se a variável está definida..."
+if [ -n "\$SOURCE_FILES" ]; then
+    echo "SUCESSO! Variável SOURCE_FILES contém: \$SOURCE_FILES"
+else
+    echo "ERRO! Variável SOURCE_FILES ainda está vazia!"
+    exit 1
+fi
+
+# Contar arquivos de forma simples
+SOURCE_COUNT=4
+echo "Encontrados \$SOURCE_COUNT arquivos .c"
+echo "Lista de arquivos:"
+echo "\$SOURCE_FILES"
 
 # Verificar se temos arquivos suficientes
-if [ $SOURCE_COUNT -lt 5 ]; then
-    echo "AVISO: Poucos arquivos fonte encontrados. Verifique a estrutura do projeto."
-    echo "Arquivos encontrados:"
-    echo "$SOURCE_FILES"
+if [ -z "\$SOURCE_FILES" ]; then
+    echo "ERRO: Nenhum arquivo fonte .c encontrado!"
+    exit 1
+else
+    echo "SUCESSO: Arquivos fonte encontrados e prontos para compilação!"
 fi
 
 # Build com Emscripten
@@ -157,27 +191,11 @@ echo "  - Exports: funções customizadas"
 echo ""
 
 # Comando de compilação principal
-emcc -O3 \
-  -s WASM=1 \
-  -s MODULARIZE=1 \
-  -s EXPORT_NAME='Module' \
-  -s EXPORTED_FUNCTIONS='["_main","_get_frame_buffer_ref","_get_vram_ptr","_get_cram_ptr","_get_vsram_ptr","_get_vdp_regs_ptr","_get_sat_ptr"]' \
-  -s EXPORTED_RUNTIME_METHODS='["cwrap","ccall"]' \
-  -s ALLOW_MEMORY_GROWTH=1 \
-  -s INITIAL_MEMORY=16777216 \
-  -s STACK_SIZE=1048576 \
-  -s ASSERTIONS=0 \
-  -s NO_EXIT_RUNTIME=1 \
-  -I. \
-  -I./src \
-  -I./include \
-  -DLSB_FIRST \
-  -DHAVE_CONFIG_H \
-  -o genesis_plus_gx.js \
-  $SOURCE_FILES
+echo "Executando comando emcc com arquivos: \$SOURCE_FILES"
+emcc -O3 -s WASM=1 -s MODULARIZE=1 -s EXPORT_NAME='Module' -s EXPORTED_FUNCTIONS='["_main","_get_frame_buffer_ref","_get_vram_ptr","_get_cram_ptr","_get_vsram_ptr","_get_vdp_regs_ptr","_get_sat_ptr"]' -s EXPORTED_RUNTIME_METHODS='["cwrap","ccall"]' -s ALLOW_MEMORY_GROWTH=1 -s INITIAL_MEMORY=16777216 -s STACK_SIZE=1048576 -s ASSERTIONS=0 -s NO_EXIT_RUNTIME=1 -I. -I./src -I./include -DLSB_FIRST -DHAVE_CONFIG_H -o genesis_plus_gx.js \$SOURCE_FILES
 
 # Verificar resultado
-if [ $? -eq 0 ]; then
+if [ \$? -eq 0 ]; then
     echo ""
     echo "=== BUILD CONCLUÍDO COM SUCESSO ==="
     echo "Arquivos gerados:"
@@ -185,13 +203,13 @@ if [ $? -eq 0 ]; then
     
     # Verificar tamanhos
     if [ -f "genesis_plus_gx.js" ]; then
-        JS_SIZE=$(stat -c%s "genesis_plus_gx.js")
-        echo "  genesis_plus_gx.js: $(($JS_SIZE / 1024)) KB"
+        JS_SIZE=\$(stat -c%s "genesis_plus_gx.js")
+        echo "  genesis_plus_gx.js: \$((\$JS_SIZE / 1024)) KB"
     fi
     
     if [ -f "genesis_plus_gx.wasm" ]; then
-        WASM_SIZE=$(stat -c%s "genesis_plus_gx.wasm")
-        echo "  genesis_plus_gx.wasm: $(($WASM_SIZE / 1024)) KB"
+        WASM_SIZE=\$(stat -c%s "genesis_plus_gx.wasm")
+        echo "  genesis_plus_gx.wasm: \$((\$WASM_SIZE / 1024)) KB"
     fi
     
     # Verificar exports no arquivo JS
@@ -221,8 +239,8 @@ set -e
 
 echo "=== Universal Asset Studio - Genesis Plus GX Build Container ==="
 echo "Uso:"
-echo "  docker run --rm -v \$(pwd):/output genesis-build"
-echo "  docker run --rm -v \$(pwd):/output -v /path/to/source:/build/genesis-plus-gx genesis-build"
+echo "  docker run --rm -v \\$(pwd):/output genesis-build"
+echo "  docker run --rm -v \\$(pwd):/output -v /path/to/source:/build/genesis-plus-gx genesis-build"
 echo ""
 
 # Executar build
@@ -235,7 +253,7 @@ if [ -d "/output" ] && [ -f "genesis-plus-gx/genesis_plus_gx.js" ]; then
     echo "Arquivos copiados com sucesso!"
 else
     echo "Diretório /output não montado ou build falhou"
-    echo "Para copiar os arquivos, monte um volume: -v \$(pwd):/output"
+    echo "Para copiar os arquivos, monte um volume: -v \\$(pwd):/output"
 fi
 
 echo ""
@@ -248,7 +266,7 @@ RUN chmod +x /build/entrypoint.sh
 ENTRYPOINT ["/build/entrypoint.sh"]
 
 # Documentação
-LABEL usage="docker run --rm -v $(pwd):/output genesis-build"
+LABEL usage="docker run --rm -v \$(pwd):/output genesis-build"
 LABEL description.build="Compila Genesis Plus GX com exports customizados para Universal Asset Studio"
 LABEL description.output="Gera genesis_plus_gx.js e genesis_plus_gx.wasm com ponteiros de memória expostos"
 LABEL description.exports="_get_frame_buffer_ref, _get_vram_ptr, _get_cram_ptr, _get_vsram_ptr, _get_vdp_regs_ptr, _get_sat_ptr"

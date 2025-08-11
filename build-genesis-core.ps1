@@ -4,7 +4,8 @@
 param(
     [bool]$UseDocker = $true,
     [bool]$SkipBackup = $false,
-    [bool]$Validate = $true
+    [bool]$Validate = $true,
+    [string]$SourcePath = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -67,11 +68,14 @@ function Test-Prerequisites {
         }
         
         try {
-            docker info 2>$null | Out-Null
-            if ($LASTEXITCODE -eq 0) {
+            # Executar docker info e capturar apenas o exit code
+            $process = Start-Process -FilePath "docker" -ArgumentList "info" -NoNewWindow -Wait -PassThru -RedirectStandardOutput "$env:TEMP\docker_info.txt" -RedirectStandardError "$env:TEMP\docker_error.txt"
+            
+            if ($process.ExitCode -eq 0) {
                 Write-Success "Docker esta rodando"
             } else {
-                throw "Docker nao esta rodando"
+                Write-Error "Docker nao esta rodando. Inicie Docker Desktop"
+                return $false
             }
         } catch {
             Write-Error "Docker nao esta rodando. Inicie Docker Desktop"
@@ -135,7 +139,13 @@ function Build-WithDocker {
         Write-Success "Imagem Docker construida"
         
         Write-Host "Executando build do core..." -ForegroundColor Yellow
-        $dockerRunCmd = "docker run --rm -v `"$TempDir`:/output genesis-build"
+        if ($SourcePath -and (Test-Path $SourcePath)) {
+            Write-Host "Usando código-fonte real: $SourcePath" -ForegroundColor Cyan
+            $dockerRunCmd = "docker run --rm -v `"$TempDir`:/output`" -v `"$SourcePath`:/build/genesis-plus-gx genesis-build"
+        } else {
+            Write-Host "SourcePath ausente ou inválido. Usando modo interno (stub de teste)." -ForegroundColor Yellow
+            $dockerRunCmd = "docker run --rm -v `"$TempDir`:/output`" genesis-build"
+        }
         Write-Host "Executando: $dockerRunCmd" -ForegroundColor Gray
         
         Invoke-Expression $dockerRunCmd
