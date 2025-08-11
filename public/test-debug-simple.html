@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Debug EmulatorJS</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        #logs {
+            background: #000;
+            color: #0f0;
+            padding: 10px;
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #333;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+        #emulator-container {
+            width: 320px;
+            height: 240px;
+            border: 1px solid #333;
+            margin: 10px 0;
+        }
+        button {
+            background: #333;
+            color: #fff;
+            border: 1px solid #555;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎮 Teste Debug EmulatorJS</h1>
+    
+    <div id="logs"></div>
+    
+    <div>
+        <button onclick="initEmulator()">Inicializar Emulador</button>
+        <button onclick="clearLogs()">Limpar Logs</button>
+    </div>
+    
+    <div id="emulator-container"></div>
+    
+    <script>
+        function log(message) {
+            const logs = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            logs.innerHTML += `[${timestamp}] ${message}\n`;
+            logs.scrollTop = logs.scrollHeight;
+            console.log(message);
+        }
+        
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+        }
+        
+        function initEmulator() {
+            log('🚀 Iniciando teste do EmulatorJS...');
+            
+            try {
+                // Configurar variáveis globais
+                window.EJS_player = '#emulator-container';
+                window.EJS_core = 'genesis_plus_gx';
+                window.EJS_pathtodata = '/emulatorjs-data/';
+                window.EJS_startOnLoaded = false;
+                
+                log('✅ Variáveis globais configuradas:');
+                log(`   EJS_player: ${window.EJS_player}`);
+                log(`   EJS_core: ${window.EJS_core}`);
+                log(`   EJS_pathtodata: ${window.EJS_pathtodata}`);
+                
+                // Callback de prontidão
+                window.EJS_ready = function() {
+                    log('🎉 EJS_ready callback executado!');
+                    log('   EJS_emulator disponível: ' + !!window.EJS_emulator);
+                    
+                    if (window.EJS_emulator) {
+                        log('   Métodos disponíveis: ' + Object.keys(window.EJS_emulator).join(', '));
+                    }
+                };
+                
+                // Carregar loader.js
+                log('📥 Carregando loader.js...');
+                const script = document.createElement('script');
+                script.src = '/emulatorjs-data/loader.js';
+                script.async = true;
+                
+                script.onload = function() {
+                    log('✅ loader.js carregado com sucesso');
+                    
+                    // Aguardar EJS_emulator
+                    let attempts = 0;
+                    const checkEmulator = setInterval(() => {
+                        attempts++;
+                        log(`⏳ Verificando EJS_emulator... tentativa ${attempts}`);
+                        
+                        if (window.EJS_emulator) {
+                            clearInterval(checkEmulator);
+                            log('🎮 EJS_emulator disponível!');
+                            log('   Tipo: ' + typeof window.EJS_emulator);
+                            log('   Métodos: ' + Object.keys(window.EJS_emulator).join(', '));
+                        } else if (attempts > 50) {
+                            clearInterval(checkEmulator);
+                            log('❌ Timeout: EJS_emulator não foi criado');
+                        }
+                    }, 200);
+                };
+                
+                script.onerror = function(e) {
+                    log('❌ Erro ao carregar loader.js: ' + e.message);
+                };
+                
+                document.head.appendChild(script);
+                
+            } catch (error) {
+                log('❌ Erro durante inicialização: ' + error.message);
+            }
+        }
+        
+        log('📋 Página carregada. Clique em "Inicializar Emulador" para começar.');
+    </script>
+</body>
+</html>

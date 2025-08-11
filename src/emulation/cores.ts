@@ -29,6 +29,8 @@ export interface CoreDescriptor {
 export const CORES: CoreDescriptor[] = [
   {
     id: 'megadrive',
+    // Use generic group key so o EmulatorJS resolva o core correto (genesis_plus_gx por padrão)
+    // Isso evita acoplamento direto ao nome específico do core e segue o fluxo de getCore()
     ejsCore: 'segaMD',
     defaultResolution: { width: 320, height: 224 },
     exports: {

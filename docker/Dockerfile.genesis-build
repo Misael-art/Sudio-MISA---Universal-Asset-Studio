@@ -1,0 +1,254 @@
+# Dockerfile para Build do Genesis Plus GX Core
+# Universal Asset Studio - Ambiente de Build Controlado
+
+FROM emscripten/emsdk:3.1.45
+
+# Metadados
+LABEL maintainer="Universal Asset Studio"
+LABEL description="Ambiente para recompilação do Genesis Plus GX com exports customizados"
+LABEL version="1.0"
+
+# Instalar dependências adicionais
+RUN apt-get update && apt-get install -y \
+    git \
+    make \
+    cmake \
+    build-essential \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# Criar diretório de trabalho
+WORKDIR /build
+
+# Script de build integrado
+COPY <<EOF /build/build-genesis-core.sh
+#!/bin/bash
+set -e
+
+echo "=== Universal Asset Studio - Genesis Plus GX Build ==="
+echo "Emscripten Version: $(emcc --version | head -1)"
+echo "Working Directory: $(pwd)"
+echo ""
+
+# Verificar se o código fonte está presente
+if [ ! -d "genesis-plus-gx" ]; then
+    echo "Clonando Genesis Plus GX..."
+    git clone https://github.com/EmulatorJS/Genesis-Plus-GX.git genesis-plus-gx
+fi
+
+cd genesis-plus-gx
+
+# Criar arquivo de exports se não existir
+if [ ! -f "emscripten_exports.c" ]; then
+    echo "Criando arquivo de exports..."
+    cat > emscripten_exports.c << 'EXPORTS_EOF'
+#include <stdint.h>
+#include <emscripten/emscripten.h>
+
+/**
+ * Universal Asset Studio - Exports obrigatórios
+ * 
+ * IMPORTANTE: Estes ponteiros devem ser ajustados conforme a estrutura
+ * real do código do Genesis Plus GX. Os nomes das variáveis podem variar.
+ * 
+ * Localizações típicas:
+ * - vdp.c/vdp.h: VRAM, CRAM, VSRAM, registradores
+ * - render.c: framebuffer
+ * - vdp_ctrl.c: SAT (Sprite Attribute Table)
+ */
+
+// Declarações externas - AJUSTAR CONFORME CÓDIGO REAL
+// Estas são estimativas baseadas na estrutura típica do Genesis Plus GX
+extern uint8_t vram[];           // VRAM array
+extern uint16_t cram[];          // Color RAM
+extern uint16_t vsram[];         // Vertical Scroll RAM
+extern uint8_t reg[];            // VDP registers
+extern uint16_t sat[];           // Sprite Attribute Table
+
+// Framebuffer - pode estar em diferentes locais
+// Verificar render.c, bitmap.c ou similar
+extern uint32_t* framebuffer;    // ou uint8_t* dependendo da implementação
+
+/**
+ * Retorna ponteiro para o framebuffer RGBA
+ * Tamanho esperado: width * height * 4 bytes
+ */
+EMSCRIPTEN_KEEPALIVE uint32_t _get_frame_buffer_ref(void) {
+    return (uint32_t)framebuffer;
+}
+
+/**
+ * Retorna ponteiro para VRAM (Video RAM)
+ * Tamanho: 0x10000 bytes (64KB)
+ */
+EMSCRIPTEN_KEEPALIVE uint32_t _get_vram_ptr(void) {
+    return (uint32_t)vram;
+}
+
+/**
+ * Retorna ponteiro para CRAM (Color RAM)
+ * Tamanho: 0x80 bytes (128 bytes)
+ */
+EMSCRIPTEN_KEEPALIVE uint32_t _get_cram_ptr(void) {
+    return (uint32_t)cram;
+}
+
+/**
+ * Retorna ponteiro para VSRAM (Vertical Scroll RAM)
+ * Tamanho: ~0x50 bytes (~80 bytes)
+ */
+EMSCRIPTEN_KEEPALIVE uint32_t _get_vsram_ptr(void) {
+    return (uint32_t)vsram;
+}
+
+/**
+ * Retorna ponteiro para registradores do VDP
+ * Tamanho: ~0x20 bytes (~32 bytes)
+ */
+EMSCRIPTEN_KEEPALIVE uint32_t _get_vdp_regs_ptr(void) {
+    return (uint32_t)reg;
+}
+
+/**
+ * Retorna ponteiro para SAT (Sprite Attribute Table)
+ * Tamanho: 0x280 bytes (640 bytes)
+ */
+EMSCRIPTEN_KEEPALIVE uint32_t _get_sat_ptr(void) {
+    return (uint32_t)sat;
+}
+EXPORTS_EOF
+    echo "Arquivo emscripten_exports.c criado"
+fi
+
+# Detectar estrutura do projeto
+echo "Analisando estrutura do projeto..."
+if [ -f "Makefile" ]; then
+    echo "Makefile encontrado"
+    make clean || true
+elif [ -f "CMakeLists.txt" ]; then
+    echo "CMake encontrado"
+    mkdir -p build && cd build
+    cmake .. || true
+    cd ..
+else
+    echo "Estrutura de build não detectada, usando build manual"
+fi
+
+# Encontrar arquivos fonte
+echo "Localizando arquivos fonte..."
+SOURCE_FILES=$(find . -name "*.c" -not -path "./build/*" -not -path "./.git/*" | head -50)
+SOURCE_COUNT=$(echo "$SOURCE_FILES" | wc -l)
+echo "Encontrados $SOURCE_COUNT arquivos .c"
+
+# Verificar se temos arquivos suficientes
+if [ $SOURCE_COUNT -lt 5 ]; then
+    echo "AVISO: Poucos arquivos fonte encontrados. Verifique a estrutura do projeto."
+    echo "Arquivos encontrados:"
+    echo "$SOURCE_FILES"
+fi
+
+# Build com Emscripten
+echo "Iniciando compilação com Emscripten..."
+echo "Flags de compilação:"
+echo "  - Otimização: -O3"
+echo "  - WebAssembly: habilitado"
+echo "  - Módulo: modularizado"
+echo "  - Exports: funções customizadas"
+echo ""
+
+# Comando de compilação principal
+emcc -O3 \
+  -s WASM=1 \
+  -s MODULARIZE=1 \
+  -s EXPORT_NAME='Module' \
+  -s EXPORTED_FUNCTIONS='["_main","_get_frame_buffer_ref","_get_vram_ptr","_get_cram_ptr","_get_vsram_ptr","_get_vdp_regs_ptr","_get_sat_ptr"]' \
+  -s EXPORTED_RUNTIME_METHODS='["cwrap","ccall"]' \
+  -s ALLOW_MEMORY_GROWTH=1 \
+  -s INITIAL_MEMORY=16777216 \
+  -s STACK_SIZE=1048576 \
+  -s ASSERTIONS=0 \
+  -s NO_EXIT_RUNTIME=1 \
+  -I. \
+  -I./src \
+  -I./include \
+  -DLSB_FIRST \
+  -DHAVE_CONFIG_H \
+  -o genesis_plus_gx.js \
+  $SOURCE_FILES
+
+# Verificar resultado
+if [ $? -eq 0 ]; then
+    echo ""
+    echo "=== BUILD CONCLUÍDO COM SUCESSO ==="
+    echo "Arquivos gerados:"
+    ls -la genesis_plus_gx.*
+    
+    # Verificar tamanhos
+    if [ -f "genesis_plus_gx.js" ]; then
+        JS_SIZE=$(stat -c%s "genesis_plus_gx.js")
+        echo "  genesis_plus_gx.js: $(($JS_SIZE / 1024)) KB"
+    fi
+    
+    if [ -f "genesis_plus_gx.wasm" ]; then
+        WASM_SIZE=$(stat -c%s "genesis_plus_gx.wasm")
+        echo "  genesis_plus_gx.wasm: $(($WASM_SIZE / 1024)) KB"
+    fi
+    
+    # Verificar exports no arquivo JS
+    echo ""
+    echo "Verificando exports no arquivo gerado..."
+    if grep -q "_get_vram_ptr" genesis_plus_gx.js; then
+        echo "  ✓ Exports encontrados no arquivo JS"
+    else
+        echo "  ⚠ Exports não encontrados - verifique se as funções foram incluídas"
+    fi
+    
+else
+    echo ""
+    echo "=== ERRO NO BUILD ==="
+    echo "Verifique os logs acima para detalhes do erro"
+    exit 1
+fi
+EOF
+
+# Tornar o script executável
+RUN chmod +x /build/build-genesis-core.sh
+
+# Script de entrada
+COPY <<EOF /build/entrypoint.sh
+#!/bin/bash
+set -e
+
+echo "=== Universal Asset Studio - Genesis Plus GX Build Container ==="
+echo "Uso:"
+echo "  docker run --rm -v \$(pwd):/output genesis-build"
+echo "  docker run --rm -v \$(pwd):/output -v /path/to/source:/build/genesis-plus-gx genesis-build"
+echo ""
+
+# Executar build
+/build/build-genesis-core.sh
+
+# Copiar resultados para output se montado
+if [ -d "/output" ] && [ -f "genesis-plus-gx/genesis_plus_gx.js" ]; then
+    echo "Copiando resultados para /output..."
+    cp genesis-plus-gx/genesis_plus_gx.* /output/
+    echo "Arquivos copiados com sucesso!"
+else
+    echo "Diretório /output não montado ou build falhou"
+    echo "Para copiar os arquivos, monte um volume: -v \$(pwd):/output"
+fi
+
+echo ""
+echo "Build container finalizado!"
+EOF
+
+RUN chmod +x /build/entrypoint.sh
+
+# Configurar entrada padrão
+ENTRYPOINT ["/build/entrypoint.sh"]
+
+# Documentação
+LABEL usage="docker run --rm -v $(pwd):/output genesis-build"
+LABEL description.build="Compila Genesis Plus GX com exports customizados para Universal Asset Studio"
+LABEL description.output="Gera genesis_plus_gx.js e genesis_plus_gx.wasm com ponteiros de memória expostos"
+LABEL description.exports="_get_frame_buffer_ref, _get_vram_ptr, _get_cram_ptr, _get_vsram_ptr, _get_vdp_regs_ptr, _get_sat_ptr"

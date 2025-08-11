@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Direto do Loader</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        #logs {
+            background: #000;
+            color: #0f0;
+            padding: 10px;
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #333;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        #emulator-container {
+            width: 320px;
+            height: 240px;
+            border: 1px solid #333;
+            margin: 10px 0;
+            background: #222;
+        }
+        button {
+            background: #333;
+            color: #fff;
+            border: 1px solid #555;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #555;
+        }
+        .status {
+            padding: 5px;
+            margin: 5px 0;
+            border-radius: 3px;
+        }
+        .success { background: #004400; }
+        .error { background: #440000; }
+        .warning { background: #444400; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Teste Direto do Loader EmulatorJS</h1>
+    
+    <div id="status" class="status">Aguardando...</div>
+    
+    <div id="logs"></div>
+    
+    <div>
+        <button onclick="testLoader()">Testar Loader</button>
+        <button onclick="testWithRom()">Testar com ROM</button>
+        <button onclick="clearLogs()">Limpar Logs</button>
+    </div>
+    
+    <div id="emulator-container"></div>
+    
+    <script>
+        let logCount = 0;
+        
+        function log(message, type = 'info') {
+            const logs = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            const colors = {
+                info: '#0f0',
+                error: '#f00',
+                warning: '#ff0',
+                success: '#0f0'
+            };
+            
+            logCount++;
+            logs.innerHTML += `<span style="color: ${colors[type]}">[${timestamp}] ${logCount}: ${message}</span>\n`;
+            logs.scrollTop = logs.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+        
+        function setStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+        
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+            logCount = 0;
+        }
+        
+        // Interceptar erros globais
+        window.addEventListener('error', function(e) {
+            log(`❌ Erro global: ${e.message} em ${e.filename}:${e.lineno}`, 'error');
+        });
+        
+        window.addEventListener('unhandledrejection', function(e) {
+            log(`❌ Promise rejeitada: ${e.reason}`, 'error');
+        });
+        
+        function testLoader() {
+            log('🚀 Iniciando teste do loader...', 'info');
+            setStatus('Testando loader...', 'warning');
+            
+            try {
+                // Limpar estado anterior
+                if (window.EJS_emulator) {
+                    log('🗑️ Removendo EJS_emulator anterior', 'info');
+                    delete window.EJS_emulator;
+                }
+                
+                // Configurar variáveis globais
+                window.EJS_player = '#emulator-container';
+                window.EJS_core = 'segaMD';
+                window.EJS_pathtodata = '/emulatorjs-data/';
+                window.EJS_startOnLoaded = true;
+                
+                log('✅ Variáveis configuradas:', 'success');
+                log(`   EJS_player: ${window.EJS_player}`, 'info');
+                log(`   EJS_core: ${window.EJS_core}`, 'info');
+                log(`   EJS_pathtodata: ${window.EJS_pathtodata}`, 'info');
+                
+                // Callback de prontidão
+                window.EJS_ready = function() {
+                    log('🎉 EJS_ready executado!', 'success');
+                    setStatus('EJS_ready executado!', 'success');
+                    
+                    if (window.EJS_emulator) {
+                        log('✅ EJS_emulator disponível', 'success');
+                        log(`   Tipo: ${typeof window.EJS_emulator}`, 'info');
+                        
+                        try {
+                            const methods = Object.getOwnPropertyNames(window.EJS_emulator);
+                            log(`   Métodos (${methods.length}): ${methods.slice(0, 10).join(', ')}${methods.length > 10 ? '...' : ''}`, 'info');
+                            const gm = window.EJS_emulator.gameManager;
+                            if (gm) {
+                                log(`   GM.Module: ${!!gm.Module} GM.FS: ${!!gm.FS} GM.functions: ${!!gm.functions}`, 'info');
+                                if (gm.Module) {
+                                    const keys = Object.keys(gm.Module);
+                                    log(`   GM.Module keys (amostra): ${keys.slice(0,20).join(', ')}${keys.length>20?'...':''}`, 'info');
+                                }
+                            }
+                        } catch (e) {
+                            log(`   Erro ao listar métodos: ${e.message}`, 'warning');
+                        }
+                    } else {
+                        log('❌ EJS_emulator ainda não disponível', 'error');
+                    }
+                };
+                
+                // Guarda para não reinjetar múltiplas vezes
+                const existingScript = document.querySelector('script[data-ejs-loader]');
+                if (existingScript) {
+                    log('✅ loader.js já presente, não reinjetar', 'warning');
+                    if (!window.EJS_emulator && typeof window.EmulatorJS === 'function') {
+                        log('⚙️ Instanciando EmulatorJS manualmente (loader reutilizado)', 'info');
+                        const config = {
+                            gameUrl: window.EJS_gameUrl,
+                            dataPath: window.EJS_pathtodata,
+                            system: window.EJS_core,
+                            startOnLoad: window.EJS_startOnLoaded,
+                            fullscreenOnLoad: window.EJS_fullscreenOnLoaded,
+                            filePaths: window.EJS_paths,
+                            threads: window.EJS_threads,
+                            forceLegacyCores: window.EJS_forceLegacyCores,
+                        };
+                        // eslint-disable-next-line no-new
+                        window.EJS_emulator = new window.EmulatorJS(window.EJS_player, config);
+                        if (typeof window.EJS_ready === 'function') window.EJS_emulator.on('ready', window.EJS_ready);
+                    }
+                }
+                
+                // Carregar loader.js
+                log('📥 Carregando loader.js...', 'info');
+                const script = document.createElement('script');
+                script.src = '/emulatorjs-data/loader.js';
+                script.async = true;
+                script.dataset.ejsLoader = 'true';
+                
+                script.onload = function() {
+                    log('✅ loader.js carregado', 'success');
+                    setStatus('Loader carregado, aguardando emulador...', 'warning');
+                    
+                    // Monitorar EJS_emulator
+                    let attempts = 0;
+                    const maxAttempts = 100;
+                    
+                    const checkEmulator = setInterval(() => {
+                        attempts++;
+                        
+                        if (window.EJS_emulator) {
+                            clearInterval(checkEmulator);
+                            log(`🎮 EJS_emulator criado após ${attempts} tentativas!`, 'success');
+                            setStatus('Emulador inicializado com sucesso!', 'success');
+                            
+                            try {
+                                log(`   Constructor: ${window.EJS_emulator.constructor.name}`, 'info');
+                                log(`   Prototype: ${Object.getPrototypeOf(window.EJS_emulator).constructor.name}`, 'info');
+                            } catch (e) {
+                                log(`   Erro ao analisar constructor: ${e.message}`, 'warning');
+                            }
+                            
+                        } else if (attempts >= maxAttempts) {
+                            clearInterval(checkEmulator);
+                            log(`❌ Timeout após ${attempts} tentativas`, 'error');
+                            setStatus('Timeout: Emulador não inicializou', 'error');
+                        } else if (attempts % 10 === 0) {
+                            log(`⏳ Tentativa ${attempts}/${maxAttempts}...`, 'info');
+                        }
+                    }, 100);
+                };
+                
+                script.onerror = function(e) {
+                    log(`❌ Erro ao carregar loader.js: ${e.message || 'Erro desconhecido'}`, 'error');
+                    setStatus('Erro ao carregar loader', 'error');
+                };
+                
+                document.head.appendChild(script);
+                
+            } catch (error) {
+                log(`❌ Erro durante teste: ${error.message}`, 'error');
+                setStatus('Erro durante teste', 'error');
+            }
+        }
+        
+        async function testWithRom() {
+            log('🎮 Testando com ROM...', 'info');
+            
+            if (!window.EJS_emulator) {
+                log('❌ EJS_emulator não disponível. Execute "Testar Loader" primeiro.', 'error');
+                return;
+            }
+            
+            try {
+                // Configurar eventos do emulador
+                if (typeof window.EJS_emulator.on === 'function') {
+                    window.EJS_emulator.on('gameLoaded', () => {
+                        log('🎉 Evento gameLoaded disparado!', 'success');
+                    });
+                    
+                    window.EJS_emulator.on('error', (error) => {
+                        log(`❌ Evento error: ${error}`, 'error');
+                    });
+                    
+                    window.EJS_emulator.on('saveDatabaseLoaded', (fs) => {
+                        log('💾 Sistema de arquivos carregado', 'success');
+                        log(`   FS disponível: ${!!fs}`, 'info');
+                    });
+                }
+                
+                // Espera Module estar disponível (initModule concluído)
+                let attempts = 0;
+                while ((!window.EJS_emulator.Module) && attempts < 200) {
+                    await new Promise(r => setTimeout(r, 100));
+                    attempts++;
+                    if (attempts % 20 === 0) log(`⏳ Aguardando Module... (${attempts}/200)`, 'info');
+                }
+                if (!window.EJS_emulator.Module) {
+                    log('❌ Timeout aguardando Module', 'error');
+                    return;
+                }
+
+                // Configurar ROM
+                window.EJS_gameUrl = '/data/rom_teste.bin';
+                log(`📁 ROM configurada: ${window.EJS_gameUrl}`, 'info');
+                
+                if (typeof window.EJS_emulator.downloadFiles === 'function') {
+                    log('📥 Disparando downloadFiles...', 'info');
+                    window.EJS_emulator.downloadFiles();
+                    log('✅ downloadFiles disparado', 'success');
+                    
+                    // Monitorar se o jogo foi carregado
+                    let checkAttempts = 0;
+                    const checkGameLoaded = setInterval(() => {
+                        checkAttempts++;
+                        
+                        if (window.EJS_emulator.gameManager) {
+                            clearInterval(checkGameLoaded);
+                            log(`🎮 GameManager criado após ${checkAttempts} verificações!`, 'success');
+                            
+                            if (window.EJS_emulator.gameManager.FS) {
+                                log('📂 Sistema de arquivos disponível', 'success');
+                            }
+                        } else if (checkAttempts > 50) {
+                            clearInterval(checkGameLoaded);
+                            log('⏰ Timeout aguardando GameManager', 'warning');
+                        }
+                    }, 200);
+                    
+                } else {
+                    log('❌ downloadFiles não é uma função', 'error');
+                    log(`   Tipo: ${typeof window.EJS_emulator.downloadFiles}`, 'info');
+                }
+                
+            } catch (error) {
+                log(`❌ Erro ao testar ROM: ${error.message}`, 'error');
+            }
+        }
+        
+        log('📋 Página carregada. Clique em "Testar Loader" para começar.', 'info');
+        setStatus('Pronto para teste', 'success');
+    </script>
+</body>
+</html>

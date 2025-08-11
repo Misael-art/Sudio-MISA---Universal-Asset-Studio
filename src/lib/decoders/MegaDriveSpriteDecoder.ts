@@ -52,8 +52,8 @@ export class MegaDriveSpriteDecoder {
     
     // CORREÇÃO CRÍTICA: Aceita tanto VSRAM (128 bytes) quanto SAT completa (640 bytes)
     if (satData.length < 128) {
-      console.warn(`[MegaDriveSpriteDecoder] Dados insuficientes (${satData.length} bytes), gerando sprites de teste`);
-      return this.generateTestSprites(5); // Gera 5 sprites de teste
+      console.warn(`[MegaDriveSpriteDecoder] Dados insuficientes (${satData.length} bytes); retornando vazio (sem mocks)`);
+      return [];
     }
     
     console.log(`[MegaDriveSpriteDecoder] ✅ Dados SAT suficientes: ${satData.length} bytes`);
@@ -135,17 +135,16 @@ export class MegaDriveSpriteDecoder {
       
       console.log(`[MegaDriveSpriteDecoder] 📊 RESULTADO FINAL: ${sprites.length} sprites criados com sucesso`);
       
-      // Se não encontrou sprites válidos, gera sprites de teste
+      // Se não encontrou sprites válidos, retorna vazio (sem mocks)
       if (sprites.length === 0) {
-        console.warn('[MegaDriveSpriteDecoder] ⚠️ NENHUM sprite válido encontrado, gerando sprites de teste como fallback');
-        console.warn('[MegaDriveSpriteDecoder] ⚠️ Isso indica que os dados SAT/VRAM não contêm sprites válidos');
-        return this.generateTestSprites(3);
+        console.warn('[MegaDriveSpriteDecoder] ⚠️ NENHUM sprite válido encontrado. Retornando vazio (sem mocks).');
+        return [];
       }
       
     } catch (error) {
-      console.error('[MegaDriveSpriteDecoder] ❌ ERRO CRÍTICO na decodificação, gerando sprites de teste:', error);
+      console.error('[MegaDriveSpriteDecoder] ❌ ERRO CRÍTICO na decodificação. Retornando vazio (sem mocks):', error);
       console.error('[MegaDriveSpriteDecoder] ❌ Stack trace:', error instanceof Error ? error.stack : 'N/A');
-      return this.generateTestSprites(3);
+      return [];
     }
     
     console.log(`[MegaDriveSpriteDecoder] 🎉 SUCESSO: ${sprites.length} sprites decodificados e prontos para uso`);
@@ -485,7 +484,7 @@ export class MegaDriveSpriteDecoder {
     
     // Remover # se presente
     let hex = cssColor.trim();
-    if (hex.startsWith('#')) {
+    if (typeof hex === 'string' && hex.startsWith('#')) {
       hex = hex.substring(1);
     }
     
@@ -600,84 +599,5 @@ export class MegaDriveSpriteDecoder {
     }
   }
 
-  /**
-   * Gera múltiplos sprites de teste para desenvolvimento
-   * @param count - Número de sprites a gerar
-   * @returns Array de sprites de teste
-   */
-  static generateTestSprites(count: number = 3): MegaDriveSprite[] {
-    const sprites: MegaDriveSprite[] = [];
-    
-    for (let i = 0; i < count; i++) {
-      sprites.push(this.createTestSprite(i));
-    }
-    
-    console.log(`[MegaDriveSpriteDecoder] Gerados ${count} sprites de teste`);
-    return sprites;
-  }
-
-  /**
-   * Cria um sprite de teste para desenvolvimento
-   * @param index - Índice do sprite
-   * @returns Sprite de teste
-   */
-  static createTestSprite(index: number = 0): MegaDriveSprite {
-    const size = 32; // Sprites de teste maiores para melhor visibilidade
-    const imageData = new ImageData(size, size);
-    const data = imageData.data;
-    
-    // Cores diferentes para cada sprite de teste
-    const colors = [
-      { r: 255, g: 100, b: 100 }, // Vermelho
-      { r: 100, g: 255, b: 100 }, // Verde
-      { r: 100, g: 100, b: 255 }, // Azul
-      { r: 255, g: 255, b: 100 }, // Amarelo
-      { r: 255, g: 100, b: 255 }  // Magenta
-    ];
-    
-    const color = colors[index % colors.length];
-    
-    // Preenche com um padrão de teste reconhecível
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        const pixelIndex = (y * size + x) * 4;
-        
-        // Cria um padrão de borda para facilitar identificação
-        if (x === 0 || x === size - 1 || y === 0 || y === size - 1) {
-          // Borda branca
-          data[pixelIndex] = 255;     // R
-          data[pixelIndex + 1] = 255; // G
-          data[pixelIndex + 2] = 255; // B
-          data[pixelIndex + 3] = 255; // A
-        } else if (x < 4 || x >= size - 4 || y < 4 || y >= size - 4) {
-          // Borda interna preta
-          data[pixelIndex] = 0;       // R
-          data[pixelIndex + 1] = 0;   // G
-          data[pixelIndex + 2] = 0;   // B
-          data[pixelIndex + 3] = 255; // A
-        } else {
-          // Centro colorido
-          data[pixelIndex] = color.r;     // R
-          data[pixelIndex + 1] = color.g; // G
-          data[pixelIndex + 2] = color.b; // B
-          data[pixelIndex + 3] = 255;     // A
-        }
-      }
-    }
-    
-    return {
-      index,
-      x: 50 + (index * 40), // Espaça os sprites horizontalmente
-      y: 50 + (index * 10), // Pequeno offset vertical
-      width: size,
-      height: size,
-      tileIndex: index,
-      paletteIndex: 0,
-      horizontalFlip: false,
-      verticalFlip: false,
-      priority: false,
-      link: 0,
-      imageData
-    };
-  }
+  // Removidos geradores de sprites de teste para cumprir a política: sem mocks
 }

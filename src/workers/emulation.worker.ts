@@ -1,205 +1,164 @@
-// Universal Asset Studio - Emulation Worker
-// Fase 0: Worker básico para processamento de ROMs sem dependências externas
-// Este worker implementa o Pilar 1.1: Decodificação de Dados de Memória
+// Universal Asset Studio - Emulation Worker (Real Decoder)
+// Remove totalmente dados simulados. Este worker recebe regiões de memória reais
+// (VRAM/CRAM e SAT ou VSRAM) vindas da thread principal e decodifica sprites.
 
-import { WorkerMessage, WorkerResponse, WorkerPayload } from '../types/worker';
+import { MegaDrivePaletteDecoder } from '../lib/decoders/MegaDrivePaletteDecoder';
+import { MegaDriveTileDecoder } from '../lib/decoders/MegaDriveTileDecoder';
+import { MegaDriveSpriteDecoder } from '../lib/decoders/MegaDriveSpriteDecoder';
 
-/**
- * Gera dados VRAM simulados baseados na ROM real
- * Implementa padrões realistas de tiles para Mega Drive
- */
-const generateMockVRAMData = (romData: Uint8Array): Uint8Array => {
-  const vramData = new Uint8Array(0x10000); // 64KB VRAM
-  
-  // Gerar seed baseado na ROM
-  let seed = 0;
-  for (let i = 0; i < Math.min(romData.length, 1024); i++) {
-    seed = (seed + romData[i]) % 65536;
-  }
-  
-  // Preencher com padrões de tiles realistas
-  for (let i = 0; i < vramData.length; i += 32) {
-    seed = (seed * 1103515245 + 12345) % 65536;
-    
-    // Criar padrão de tile 8x8 (32 bytes)
-    for (let j = 0; j < 32 && (i + j) < vramData.length; j++) {
-      const pixelData = (seed + j * 17) % 256;
-      vramData[i + j] = pixelData;
-    }
-  }
-  
-  return vramData;
+type ExtractAssetsPayload = {
+  system: string;
+  vram?: Uint8Array;
+  cram?: Uint8Array;
+  vsram?: Uint8Array;
+  sat?: Uint8Array;
 };
 
-/**
- * Gera dados CRAM simulados (paletas de cores)
- * Implementa o Pilar 1.2: Decodificação de Paletas
- */
-const generateMockCRAMData = (romData: Uint8Array): Uint8Array => {
-  const cramData = new Uint8Array(0x80); // 128 bytes CRAM (64 cores)
-  
-  // Gerar seed baseado na ROM
-  let colorSeed = 0;
-  for (let i = 0; i < Math.min(romData.length, 256); i++) {
-    colorSeed = (colorSeed + romData[i]) % 4096;
-  }
-  
-  // Gerar 4 paletas de 16 cores cada
-  for (let palette = 0; palette < 4; palette++) {
-    for (let color = 0; color < 16; color++) {
-      const offset = (palette * 16 + color) * 2;
-      
-      if (color === 0) {
-        // Cor transparente (sempre 0)
-        cramData[offset] = 0x00;
-        cramData[offset + 1] = 0x00;
-      } else {
-        // Gerar cor RGB de 9 bits (formato Mega Drive)
-        colorSeed = (colorSeed * 127 + 23) % 4096;
-        const r = (colorSeed % 8) << 1;
-        const g = ((colorSeed >> 3) % 8) << 5;
-        const b = ((colorSeed >> 6) % 8) << 9;
-        
-        const color16 = r | g | b;
-        cramData[offset] = color16 & 0xFF;
-        cramData[offset + 1] = (color16 >> 8) & 0xFF;
-      }
-    }
-  }
-  
-  return cramData;
+type ExtractFromFramebufferPayload = {
+  width: number;
+  height: number;
+  framebuffer: Uint8ClampedArray; // RGBA
 };
 
-/**
- * Gera dados VSRAM simulados (scroll vertical)
- */
-const generateMockVSRAMData = (romData: Uint8Array): Uint8Array => {
-  const vsramData = new Uint8Array(0x80); // 128 bytes VSRAM
-  
-  // Preencher com valores de scroll baseados na ROM
-  let scrollSeed = 0;
-  for (let i = 0; i < Math.min(romData.length, 128); i++) {
-    scrollSeed = (scrollSeed + romData[i]) % 512;
-  }
-  
-  for (let i = 0; i < vsramData.length; i += 2) {
-    scrollSeed = (scrollSeed * 31 + 7) % 512;
-    vsramData[i] = scrollSeed & 0xFF;
-    vsramData[i + 1] = (scrollSeed >> 8) & 0xFF;
-  }
-  
-  return vsramData;
-};
+interface WorkerEnvelope<T = any> {
+  type: string;
+  payload?: T;
+}
 
-/**
- * Classe principal do worker de emulação
- * Implementa processamento de ROMs com dados simulados para a Fase 0
- */
-class EmulationWorker {
-  constructor() {
-    // Worker pronto imediatamente - sem inicialização complexa
-    self.postMessage({ 
-      status: 'info', 
-      message: 'Worker inicializado - modo local ativo (sem dependências externas)' 
-    });
-  }
+function postInfo(message: string): void {
+  // @ts-ignore
+  self.postMessage({ status: 'info', message });
+}
 
-  /**
-   * Processa ROM e extrai dados de memória
-   * Implementa o Pilar 1.1: Decodificação de Dados de Memória
-   */
-  public async processRom(payload: { romData: Uint8Array; system: string }): Promise<void> {
-    try {
-      // Validar dados de entrada
-      if (!payload || !payload.romData || payload.romData.length === 0) {
-        self.postMessage({ 
-          status: 'error', 
-          message: 'Dados de ROM inválidos ou vazios fornecidos ao worker' 
+function postError(message: string): void {
+  // @ts-ignore
+  self.postMessage({ status: 'error', message });
+}
+
+function postComplete(message: string, payload?: unknown): void {
+  // @ts-ignore
+  self.postMessage({ status: 'complete', message, payload });
+}
+
+// Handlers globais para capturar erros de inicialização do worker com detalhes
+// @ts-ignore
+self.addEventListener('error', (e: ErrorEvent) => {
+  // @ts-ignore
+  self.postMessage({ status: 'error', message: `Init error: ${e.message} (${e.filename || 'n/d'}:${e.lineno || 0}:${e.colno || 0})` });
+});
+// @ts-ignore
+self.addEventListener('unhandledrejection', (e: PromiseRejectionEvent) => {
+  // @ts-ignore
+  self.postMessage({ status: 'error', message: `Unhandled rejection: ${e.reason instanceof Error ? e.reason.message : String(e.reason)}` });
+});
+
+postInfo('Worker de decodificação carregado');
+
+self.onmessage = async (event: MessageEvent<WorkerEnvelope<ExtractAssetsPayload | ExtractFromFramebufferPayload>>) => {
+  const { type, payload } = event.data || {} as WorkerEnvelope<ExtractAssetsPayload | ExtractFromFramebufferPayload>;
+  try {
+    switch (type) {
+      case 'EXTRACT_ASSETS': {
+        if (!payload) {
+          postError('Payload ausente em EXTRACT_ASSETS');
+          return;
+        }
+        const { system, vram, cram, vsram, sat } = payload;
+        if (system !== 'megadrive') {
+          postError(`Sistema não suportado no worker: ${system}`);
+          return;
+        }
+        if (!vram || !cram) {
+          postError('VRAM/CRAM ausentes no payload');
+          return;
+        }
+        postInfo(`Decodificando Mega Drive: VRAM=${vram.byteLength} bytes, CRAM=${cram.byteLength} bytes, SAT/VSRAM=${sat?.byteLength ?? vsram?.byteLength ?? 0} bytes`);
+
+        // 1) Paletas
+        const palettes = MegaDrivePaletteDecoder.decode(cram);
+        // 2) Tiles
+        const tiles = MegaDriveTileDecoder.decode(vram);
+        // 3) SAT: usar SAT se fornecida; caso contrário, aceitar VSRAM (modo compatibilidade)
+        const spriteTable = sat ?? vsram ?? new Uint8Array(0);
+        // 4) Sprites
+        const sprites = MegaDriveSpriteDecoder.decode(spriteTable, vram, palettes);
+
+        postComplete('Decodificação concluída', {
+          sprites,
+          stats: {
+            totalSprites: sprites.length,
+            vramSize: vram.byteLength,
+            cramSize: cram.byteLength,
+            tableSize: spriteTable.byteLength,
+          }
         });
         return;
       }
 
-      self.postMessage({ 
-        status: 'info', 
-        message: `Processando ROM: ${payload.romData.length} bytes (${payload.system})` 
-      });
-      
-      // Simular tempo de processamento realista
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      self.postMessage({ 
-        status: 'info', 
-        message: 'Gerando dados de memória simulados...' 
-      });
-      
-      // Gerar dados simulados baseados na ROM real
-      const vramData = generateMockVRAMData(payload.romData);
-      const cramData = generateMockCRAMData(payload.romData);
-      const vsramData = generateMockVSRAMData(payload.romData);
+      case 'EXTRACT_FROM_FRAMEBUFFER': {
+        const p = payload as ExtractFromFramebufferPayload;
+        if (!p || !p.framebuffer || !p.width || !p.height) {
+          postError('Payload inválido em EXTRACT_FROM_FRAMEBUFFER');
+          return;
+        }
+        postInfo(`Segmentando framebuffer ${p.width}x${p.height} para sprites iniciais`);
+        const sprites = segmentSpritesFromFramebuffer(p.framebuffer, p.width, p.height);
+        postComplete('Segmentação concluída (framebuffer)', { sprites, stats: { totalSprites: sprites.length } });
+        return;
+      }
 
-      self.postMessage({ 
-        status: 'info', 
-        message: 'Dados extraídos com sucesso (modo simulado)' 
-      });
-
-      // Enviar dados processados
-      self.postMessage({
-        status: 'complete',
-        message: 'ROM processada com sucesso - dados simulados gerados',
-        payload: {
-          vram: vramData,
-          cram: cramData,
-          vsram: vsramData,
-          system: payload.system
-        },
-        isMock: true
-      });
-      
-    } catch (error: any) {
-      self.postMessage({
-        status: 'error',
-        message: `Erro no processamento da ROM: ${error.message}`
-      });
+      default:
+        postError(`Tipo de mensagem não suportado: ${type}`);
+        return;
     }
-  }
-
-  /**
-   * Limpeza de recursos
-   */
-  public destroy(): void {
-    self.postMessage({ 
-      status: 'info', 
-      message: 'Worker finalizado' 
-    });
-  }
-}
-
-// Instância do worker
-const workerInstance = new EmulationWorker();
-
-// Handler de mensagens
-self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
-  try {
-    const { type, payload } = event.data;
-    
-    if (type === 'LOAD_ROM' || type === 'EXTRACT_ASSETS') {
-      await workerInstance.processRom(payload);
-    }
-  } catch (error: any) {
-    self.postMessage({
-      status: 'error',
-      message: `Erro no handler de mensagens: ${error.message}`
-    });
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+    postError(`Falha no worker: ${msg}`);
   }
 };
 
-// Limpeza na finalização
-self.addEventListener('beforeunload', () => {
-  workerInstance.destroy();
-});
-
-// Sinalizar que o worker está pronto
-self.postMessage({
-  status: 'info',
-  message: 'Worker carregado e pronto para processamento'
-});
+// Heurística simples: divide o framebuffer em blocos fixos, mede variação e seleciona trechos com mais detalhe
+function segmentSpritesFromFramebuffer(buffer: Uint8ClampedArray, width: number, height: number): ImageData[] {
+  const tileSize = 32;
+  const step = 16; // sobreposição parcial
+  const candidates: { x: number; y: number; score: number }[] = [];
+  const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+  for (let y = 0; y <= height - tileSize; y += step) {
+    for (let x = 0; x <= width - tileSize; x += step) {
+      let sum = 0, sum2 = 0, n = 0;
+      for (let ty = 0; ty < tileSize; ty += 2) { // subamostragem leve
+        const row = (y + ty) * width;
+        for (let tx = 0; tx < tileSize; tx += 2) {
+          const idx = ((row + (x + tx)) << 2);
+          const r = buffer[idx], g = buffer[idx + 1], b = buffer[idx + 2];
+          const lum = (r * 299 + g * 587 + b * 114) / 1000;
+          sum += lum;
+          sum2 += lum * lum;
+          n++;
+        }
+      }
+      const mean = sum / n;
+      const variance = clamp(sum2 / n - mean * mean, 0, 65025);
+      candidates.push({ x, y, score: variance });
+    }
+  }
+  candidates.sort((a, b) => b.score - a.score);
+  const top = candidates.slice(0, 12); // pega top N
+  const sprites: ImageData[] = [];
+  for (const c of top) {
+    const img = new ImageData(tileSize, tileSize);
+    for (let ty = 0; ty < tileSize; ty++) {
+      const srcRow = (c.y + ty) * width;
+      for (let tx = 0; tx < tileSize; tx++) {
+        const srcIdx = ((srcRow + (c.x + tx)) << 2);
+        const dstIdx = ((ty * tileSize + tx) << 2);
+        img.data[dstIdx] = buffer[srcIdx];
+        img.data[dstIdx + 1] = buffer[srcIdx + 1];
+        img.data[dstIdx + 2] = buffer[srcIdx + 2];
+        img.data[dstIdx + 3] = buffer[srcIdx + 3];
+      }
+    }
+    sprites.push(img);
+  }
+  return sprites;
+}

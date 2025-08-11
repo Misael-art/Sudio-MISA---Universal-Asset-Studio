@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug EmulatorJS</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .log { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .error { background: #ffebee; color: #c62828; }
+        .success { background: #e8f5e8; color: #2e7d32; }
+        .info { background: #e3f2fd; color: #1565c0; }
+        #emulator-container { width: 640px; height: 480px; border: 2px solid #ccc; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <h1>Debug EmulatorJS - Universal Asset Studio</h1>
+    
+    <div id="logs"></div>
+    
+    <div id="emulator-container"></div>
+    
+    <button onclick="initEmulator()">Inicializar EmulatorJS</button>
+    <button onclick="checkStatus()">Verificar Status</button>
+    
+    <script>
+        function log(message, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const logEntry = document.createElement('div');
+            logEntry.className = `log ${type}`;
+            logEntry.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logsDiv.appendChild(logEntry);
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+        
+        function checkStatus() {
+            log('=== STATUS CHECK ===');
+            log(`window.EJS_emulator: ${!!window.EJS_emulator}`);
+            log(`window.EJS_player: ${window.EJS_player}`);
+            log(`window.EJS_core: ${window.EJS_core}`);
+            log(`window.EJS_pathtodata: ${window.EJS_pathtodata}`);
+            log(`window.EJS_ready: ${typeof window.EJS_ready}`);
+            
+            if (window.EJS_emulator) {
+                log(`EJS_emulator.gameManager: ${!!window.EJS_emulator.gameManager}`);
+                if (window.EJS_emulator.gameManager) {
+                    log(`gameManager.Module: ${!!window.EJS_emulator.gameManager.Module}`);
+                }
+            }
+        }
+        
+        async function initEmulator() {
+            try {
+                log('Iniciando configuração do EmulatorJS...', 'info');
+                
+                // Configurar variáveis globais
+                window.EJS_player = '#emulator-container';
+                window.EJS_core = 'genesis_plus_gx';
+                window.EJS_pathtodata = '/emulatorjs-data/';
+                window.EJS_startOnLoaded = false;
+                
+                log('Variáveis globais configuradas', 'success');
+                
+                // Definir callback de ready
+                window.EJS_ready = () => {
+                    log('EJS_ready callback executado!', 'success');
+                    checkStatus();
+                };
+                
+                // Carregar loader.js
+                log('Carregando loader.js...', 'info');
+                
+                const script = document.createElement('script');
+                script.src = '/emulatorjs-data/loader.js';
+                script.async = true;
+                
+                script.onload = () => {
+                    log('loader.js carregado com sucesso', 'success');
+                    
+                    // Aguardar EJS_emulator
+                    let attempts = 0;
+                    const checkEmulator = () => {
+                        attempts++;
+                        if (window.EJS_emulator) {
+                            log(`EJS_emulator disponível após ${attempts} tentativas`, 'success');
+                            checkStatus();
+                        } else if (attempts < 100) {
+                            setTimeout(checkEmulator, 100);
+                        } else {
+                            log('Timeout: EJS_emulator não foi criado', 'error');
+                        }
+                    };
+                    
+                    setTimeout(checkEmulator, 100);
+                };
+                
+                script.onerror = (error) => {
+                    log(`Erro ao carregar loader.js: ${error}`, 'error');
+                };
+                
+                document.head.appendChild(script);
+                
+            } catch (error) {
+                log(`Erro na inicialização: ${error.message}`, 'error');
+            }
+        }
+        
+        // Log inicial
+        log('Página carregada. Clique em "Inicializar EmulatorJS" para começar.', 'info');
+    </script>
+</body>
+</html>

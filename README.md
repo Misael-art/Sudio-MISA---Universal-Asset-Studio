@@ -53,6 +53,32 @@ Abra `http://localhost:5173`.
 - Captura de framebuffer e ponteiros de memória via exports cwrap do core.
 - Fallback por SaveState quando necessário.
 
+### Diagnóstico e Logs (T+ms)
+- O hook instrumenta chamadas críticas com tempos relativos ao `loadRomFile` (T+ms):
+  - `ready`, `createText`, `downloadGameCore`, `await Module`, `Module ready`, `downloadFiles`, `saveDatabaseLoaded`, `gameManager ready`, `start`, `Module.callMain`, `running`.
+- `isReady` só fica `true` após `Module` disponível (evita corridas de inicialização).
+- Wrappers seguros envolvem métodos internos do EJS para auditoria sem alterar o minificado.
+
+### Fluxo de Emulação (EmulatorJS) - Corrigido
+
+Após a refatoração para garantir uma inicialização determinística, o fluxo de interação com o hook `useEmulator` foi simplificado e tornado mais robusto. O padrão de *race condition* foi eliminado.
+
+O fluxo correto é:
+
+1.  **Inicialização do Motor:** A UI monta o componente que utiliza o hook `useEmulator`. O hook, por sua vez, inicializa o motor do EmulatorJS, carrega o `loader.js` e prepara a instância do emulador, mas **não inicia a emulação automaticamente** (`EJS_startOnLoaded = false`). O estado `isReady` do hook se torna `true` quando este processo termina.
+
+2.  **Carregamento da ROM:** O usuário seleciona um arquivo de ROM. A UI, ao detectar a seleção e verificar que `isReady` é `true`, chama a função `loadRomFile(file)` exportada pelo hook.
+
+3.  **Início da Emulação:** A função `loadRomFile` assume o controle:
+    - Define `window.EJS_gameUrl` com o arquivo da ROM.
+    - Dispara a sequência de carregamento do core (`downloadGameCore`), que por sua vez carrega a ROM, monta o sistema de arquivos e inicia a emulação.
+
+4.  **Confirmação via Evento:** O hook escuta o evento `on('start')` do emulador. Quando este evento é recebido, o estado `isRunning` do hook se torna `true`, sinalizando para a UI que a emulação está de fato rodando e que os snapshots de memória são válidos.
+
+5.  **Processamento Reativo:** A UI reage à mudança do estado `isRunning` e à chegada de novos `snapshot`s para automaticamente enviar os dados de memória (VRAM/CRAM) para o worker, sem a necessidade de um gatilho manual.
+
+Este novo fluxo elimina a necessidade de polling, remove chamadas duplicadas e garante que as operações ocorram em uma sequência previsível e livre de erros de concorrência.
+
 Cwraps esperados (MD):
 - `_get_frame_buffer_ref()`
 - `_get_vram_ptr()` (0x10000)
@@ -62,6 +88,14 @@ Cwraps esperados (MD):
 - `_get_sat_ptr()` (0x280)
 
 Consulte `.trae/documents/plano-implementacao-completo.md` (seção 0.3) para instruções de rebuild do core.
+
+### Build do Core (Genesis Plus GX)
+- Script: `build-genesis-core.ps1` recompila o core com exports requeridos.
+- Requer Docker Desktop ativo (padrão). Executar:
+  ```powershell
+  ./build-genesis-core.ps1 -UseDocker $true
+  ```
+- Valida a presença dos exports e instala artefatos em `public/emulatorjs-data/cores/`.
 
 ## Reconstrução/Renderização
 - `MegaDriveAdapter` decodifica tiles 4bpp de VRAM em `pixelIndices` e reconstrói:
