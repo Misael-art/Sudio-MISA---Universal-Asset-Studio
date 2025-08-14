@@ -8,11 +8,15 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "check": "tsc -b --noEmit"
+    "check": "tsc -b --noEmit",
+    "test": "node test/simple-test.js",
+    "test:full": "node test/emulator-test.js",
+    "test:validate": "npm run check && npm run test"
   },
   "dependencies": {
     "clsx": "^2.1.1",
     "lucide-react": "^0.511.0",
+    "puppeteer": "^24.16.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.3.0",

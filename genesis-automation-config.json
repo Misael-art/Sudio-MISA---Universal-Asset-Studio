@@ -1,0 +1,203 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "created": "2024-01-15",
+    "description": "Configuração centralizada para automação do Genesis Plus GX",
+    "author": "Universal Asset Studio - Assistente IA"
+  },
+  "paths": {
+    "workDirectory": "C:\\Users\\misae\\Desktop\\Sudio Misa\\temp\\manual-build",
+    "outputDirectory": "C:\\Users\\misae\\Desktop\\Sudio Misa\\public\\emulators",
+    "scriptsDirectory": "C:\\Users\\misae\\Desktop\\Sudio Misa\\scripts",
+    "backupDirectory": "C:\\Users\\misae\\Desktop\\Sudio Misa\\backup",
+    "logsDirectory": "C:\\Users\\misae\\Desktop\\Sudio Misa\\logs",
+    "emsdkPath": "C:\\Users\\misae\\Desktop\\Sudio Misa\\temp\\manual-build\\emsdk",
+    "genesisSourcePath": "C:\\Users\\misae\\Desktop\\Sudio Misa\\temp\\manual-build\\genesis-plus-gx"
+  },
+  "emscripten": {
+    "version": "latest",
+    "repository": "https://github.com/emscripten-core/emsdk.git",
+    "activationScript": "emsdk.bat",
+    "environmentScript": "emsdk_env.bat",
+    "compiler": "emcc",
+    "flags": {
+      "wasm": true,
+      "modularize": true,
+      "exportName": "GenesisCore",
+      "optimization": "-O2",
+      "memoryGrowth": true,
+      "initialMemory": 33554432
+    }
+  },
+  "genesis": {
+    "repository": "https://github.com/libretro/Genesis-Plus-GX.git",
+    "branch": "master",
+    "platform": "emscripten",
+    "makefileTarget": "Makefile.libretro",
+    "staticLinking": false,
+    "features": {
+      "chd": false,
+      "threads": false
+    }
+  },
+  "compilation": {
+    "outputFiles": {
+      "javascript": "genesis_plus_gx.js",
+      "webassembly": "genesis_plus_gx.wasm"
+    },
+    "exportedFunctions": [
+      "_malloc",
+      "_free",
+      "_retro_init",
+      "_retro_deinit",
+      "_retro_api_version",
+      "_retro_get_system_info",
+      "_retro_get_system_av_info",
+      "_retro_set_environment",
+      "_retro_set_video_refresh",
+      "_retro_set_audio_sample",
+      "_retro_set_audio_sample_batch",
+      "_retro_set_input_poll",
+      "_retro_set_input_state",
+      "_retro_load_game",
+      "_retro_unload_game",
+      "_retro_run",
+      "_retro_reset",
+      "_retro_serialize_size",
+      "_retro_serialize",
+      "_retro_unserialize",
+      "_retro_get_memory_data",
+      "_retro_get_memory_size",
+      "_get_vram_data",
+      "_get_cram_data",
+      "_get_sat_data",
+      "_get_vdp_registers"
+    ],
+    "exportedRuntimeMethods": [
+      "ccall",
+      "cwrap",
+      "getValue",
+      "setValue",
+      "HEAPU8",
+      "HEAP16",
+      "HEAP32"
+    ],
+    "minimumSizes": {
+      "javascript": 1024,
+      "webassembly": 102400
+    },
+    "expectedSizes": {
+      "javascript": 61440,
+      "webassembly": 2191360
+    }
+  },
+  "validation": {
+    "requiredCommands": [
+      "git",
+      "python"
+    ],
+    "requiredFiles": [
+      "Makefile.libretro",
+      "Makefile.common",
+      "emscripten_exports.c"
+    ],
+    "contentValidation": {
+      "javascript": [
+        "GenesisCore",
+        "WebAssembly"
+      ],
+      "webassembly": []
+    }
+  },
+  "backup": {
+    "enabled": true,
+    "retentionDays": 30,
+    "compressionEnabled": false,
+    "includeSourceCode": false
+  },
+  "logging": {
+    "enabled": true,
+    "level": "INFO",
+    "fileLogging": false,
+    "colorOutput": true,
+    "timestampFormat": "yyyy-MM-dd HH:mm:ss",
+    "maxLogSize": 10485760
+  },
+  "testing": {
+    "testPage": "test-genesis-emulator.html",
+    "devServerPort": 5173,
+    "testTimeout": 30000,
+    "requiredExports": [
+      "retro_init",
+      "retro_load_game",
+      "get_vram_data"
+    ]
+  },
+  "integration": {
+    "universalAssetStudio": {
+      "enabled": true,
+      "coreDirectory": "public/emulators",
+      "documentationFile": "GENESIS_EMULATOR_INTEGRATION.md",
+      "testFiles": [
+        "test-genesis-emulator.html",
+        "test-metrics.html"
+      ]
+    }
+  },
+  "scripts": {
+    "universal": "build-genesis-universal.ps1",
+    "validate": "validate-genesis-setup.ps1",
+    "activate": "activate-genesis-env.ps1"
+  },
+  "environment": {
+    "requiredPowerShellVersion": "5.1",
+    "requiredPythonVersion": "3.7",
+    "operatingSystem": "Windows",
+    "architecture": "x64"
+  },
+  "troubleshooting": {
+    "commonIssues": {
+      "gitNotFound": {
+        "description": "Git não está instalado ou não está no PATH",
+        "solution": "Instale o Git for Windows do site oficial",
+        "url": "https://git-scm.com/download/win"
+      },
+      "pythonNotFound": {
+        "description": "Python não está instalado ou não está no PATH",
+        "solution": "Instale Python 3.7+ do site oficial",
+        "url": "https://www.python.org/downloads/"
+      },
+      "emccNotFound": {
+        "description": "Emscripten não está configurado corretamente",
+        "solution": "Execute emsdk_env.bat ou reinstale com -ForceReinstall"
+      },
+      "compilationFailed": {
+        "description": "Falha na compilação do Genesis Plus GX",
+        "solution": "Verifique logs, execute com -CleanBuild ou -ForceReinstall"
+      },
+      "filesCopyFailed": {
+        "description": "Falha ao copiar arquivos para o destino",
+        "solution": "Verifique permissões do diretório de destino"
+      }
+    },
+    "diagnosticCommands": [
+      "git --version",
+      "python --version",
+      "emcc --version"
+    ]
+  },
+  "performance": {
+    "parallelJobs": 4,
+    "memoryLimit": "2GB",
+    "timeoutSeconds": 1800,
+    "cacheEnabled": true
+  },
+  "security": {
+    "allowedDomains": [
+      "github.com",
+      "localhost"
+    ],
+    "validateChecksums": false,
+    "sandboxEnabled": false
+  }
+}

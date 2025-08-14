@@ -44,7 +44,7 @@ export class MegaDriveAdapter {
       return [{ id: 'PAL0', colors: new Array(16).fill('#000000'), system: 'megadrive', source: 'CRAM' }];
     }
     const mdPalettes = MDPaletteDecoder.decode(cram);
-    return mdPalettes.map((p, idx) => ({ id: `PAL${idx}`, colors: p, system: 'megadrive', source: 'CRAM' }));
+    return mdPalettes.map((p, idx) => ({ id: `PAL${idx}`, colors: p.colors, system: 'megadrive', source: 'CRAM' as const }));
   }
 
   private decodeTiles(vram?: Uint8Array, palettes?: Palette[], diagnostics?: string[]): Tileset {

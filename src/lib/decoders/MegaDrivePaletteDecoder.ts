@@ -19,8 +19,9 @@ export class MegaDrivePaletteDecoder {
     console.log(`[MegaDrivePaletteDecoder] 📊 Primeiros 32 bytes:`, Array.from(cramData.slice(0, 32)).map(b => `0x${b.toString(16).padStart(2, '0')}`).join(' '));
     
     if (cramData.length !== 128) {
-      console.warn(`[MegaDrivePaletteDecoder] ⚠️ CRAM inválida (${cramData.length} bytes), usando paletas autênticas do Sonic`);
-      return this.createSonicPalettes();
+      const message = `CRAM inválida: esperado 128 bytes, recebido ${cramData.length}. Falha ao decodificar paletas reais. Causa provável: ponteiro ou tamanho incorreto do export _get_cram_ptr(). Ação: verifique se o core exporta _get_cram_ptr() corretamente e se o buffer está acessível.`;
+      console.error(`[MegaDrivePaletteDecoder] ❌ ${message}`);
+      throw new Error(message);
     }
 
     const palettes: MegaDrivePalette[] = [];
@@ -71,10 +72,11 @@ export class MegaDrivePaletteDecoder {
       console.log(`[MegaDrivePaletteDecoder] ✅ Total de cores na paleta ${paletteIndex}: ${colors.length}`);
     }
     
-    // Se não há cores válidas, usar paletas do Sonic
+    // Se não há cores válidas, falhar explicitamente (sem dados fictícios)
     if (!hasValidColors) {
-      console.warn('[MegaDrivePaletteDecoder] ⚠️ Nenhuma cor válida encontrada, usando paletas do Sonic');
-      return this.createSonicPalettes();
+      const message = 'CRAM sem cores válidas (todas 0). Falha ao decodificar paletas reais. Causa possível: CRAM não inicializada neste frame ou leitura incorreta do buffer. Ação: aguarde novo frame após _retro_run() ou valide o ponteiro/tamanho da CRAM.';
+      console.error(`[MegaDrivePaletteDecoder] ❌ ${message}`);
+      throw new Error(message);
     }
     
     console.log(`[MegaDrivePaletteDecoder] 🎉 DECODIFICAÇÃO CONCLUÍDA: ${palettes.length} paletas processadas`);
@@ -167,130 +169,5 @@ export class MegaDrivePaletteDecoder {
     return palette.colors[colorIndex];
   }
 
-  /**
-   * Cria paletas autênticas do Sonic the Hedgehog
-   * @returns Array de 4 paletas com cores do jogo original
-   */
-  static createSonicPalettes(): MegaDrivePalette[] {
-    console.log('[MegaDrivePaletteDecoder] 🦔 Criando paletas autênticas do Sonic...');
-    
-    return [
-      // Paleta 0 - Sonic
-      {
-        index: 0,
-        colors: [
-          '#000000', // 0 - Transparente/Preto
-          '#0000FF', // 1 - Azul do Sonic (principal)
-          '#4040FF', // 2 - Azul claro do Sonic
-          '#8080FF', // 3 - Azul muito claro
-          '#FFCC99', // 4 - Pele/bege do Sonic
-          '#FF9966', // 5 - Pele escura
-          '#FFFFFF', // 6 - Branco (olhos, luvas)
-          '#000000', // 7 - Preto (contornos)
-          '#FF0000', // 8 - Vermelho (sapatos)
-          '#CC0000', // 9 - Vermelho escuro
-          '#FFFF00', // 10 - Amarelo (fivelas)
-          '#CCCC00', // 11 - Amarelo escuro
-          '#808080', // 12 - Cinza
-          '#404040', // 13 - Cinza escuro
-          '#C0C0C0', // 14 - Cinza claro
-          '#FFFFFF'  // 15 - Branco
-        ]
-      },
-      // Paleta 1 - Inimigos/Badniks
-      {
-        index: 1,
-        colors: [
-          '#000000', // 0 - Transparente
-          '#FF0000', // 1 - Vermelho
-          '#FF4040', // 2 - Vermelho claro
-          '#FF8080', // 3 - Rosa
-          '#808080', // 4 - Cinza metálico
-          '#404040', // 5 - Cinza escuro
-          '#C0C0C0', // 6 - Prata
-          '#FFFFFF', // 7 - Branco
-          '#FFFF00', // 8 - Amarelo
-          '#FFCC00', // 9 - Laranja
-          '#00FF00', // 10 - Verde
-          '#0080FF', // 11 - Azul
-          '#8000FF', // 12 - Roxo
-          '#FF00FF', // 13 - Magenta
-          '#00FFFF', // 14 - Ciano
-          '#000080'  // 15 - Azul escuro
-        ]
-      },
-      // Paleta 2 - Anéis e Itens
-      {
-        index: 2,
-        colors: [
-          '#000000', // 0 - Transparente
-          '#FFFF00', // 1 - Amarelo dourado (anéis)
-          '#FFCC00', // 2 - Dourado
-          '#FF9900', // 3 - Laranja dourado
-          '#FFFFFF', // 4 - Branco (brilho)
-          '#FFFF80', // 5 - Amarelo claro
-          '#FFE000', // 6 - Amarelo intenso
-          '#CC9900', // 7 - Dourado escuro
-          '#FF0000', // 8 - Vermelho (power-ups)
-          '#00FF00', // 9 - Verde (power-ups)
-          '#0000FF', // 10 - Azul (power-ups)
-          '#FF00FF', // 11 - Magenta
-          '#00FFFF', // 12 - Ciano
-          '#808080', // 13 - Cinza
-          '#C0C0C0', // 14 - Prata
-          '#404040'  // 15 - Cinza escuro
-        ]
-      },
-      // Paleta 3 - Dr. Robotnik
-      {
-        index: 3,
-        colors: [
-          '#000000', // 0 - Transparente
-          '#FF0000', // 1 - Vermelho (roupa)
-          '#CC0000', // 2 - Vermelho escuro
-          '#FF4040', // 3 - Vermelho claro
-          '#FFCC99', // 4 - Pele
-          '#FF9966', // 5 - Pele escura
-          '#FFFFFF', // 6 - Branco (bigode, óculos)
-          '#000000', // 7 - Preto (contornos)
-          '#FFFF00', // 8 - Amarelo (detalhes)
-          '#808080', // 9 - Cinza metálico
-          '#404040', // 10 - Cinza escuro
-          '#C0C0C0', // 11 - Prata
-          '#0000FF', // 12 - Azul (detalhes)
-          '#00FF00', // 13 - Verde
-          '#FF00FF', // 14 - Magenta
-          '#FFCC00'  // 15 - Dourado
-        ]
-      }
-    ];
-  }
-
-  /**
-   * Cria uma paleta de teste para desenvolvimento
-   * @returns Paleta com cores básicas para testes
-   */
-  static createTestPalette(): MegaDrivePalette {
-    return {
-      index: 0,
-      colors: [
-        '#000000', // Preto
-        '#FFFFFF', // Branco
-        '#FF0000', // Vermelho
-        '#00FF00', // Verde
-        '#0000FF', // Azul
-        '#FFFF00', // Amarelo
-        '#FF00FF', // Magenta
-        '#00FFFF', // Ciano
-        '#808080', // Cinza
-        '#800000', // Marrom
-        '#008000', // Verde escuro
-        '#000080', // Azul escuro
-        '#808000', // Oliva
-        '#800080', // Roxo
-        '#008080', // Teal
-        '#C0C0C0'  // Prata
-      ]
-    };
-  }
+  // Removidos geradores de paletas fictícias para cumprir a regra "Sem dados mock/simulados"
 }

@@ -1,0 +1,1536 @@
+.ejs_parent {
+    background: #000;
+    overflow: hidden;
+    position: relative;
+    font-family: Avenir, "Avenir Next", "Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    font-weight: 500;
+    line-height: 1.7;
+    width: 100%;
+    height: 100%;
+    color: #bcbcbc;
+    outline-width: 0;
+    outline: none;
+    font-size: 14px;
+}
+
+.ejs_parent *,
+.ejs_parent *::after,
+.ejs_parent *::before {
+    font-family: Avenir, "Avenir Next", "Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif;
+    box-sizing: border-box;
+
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+.ejs_parent ::-webkit-scrollbar {
+    width: 8px;
+    height: 16px;
+}
+
+.ejs_parent ::-webkit-scrollbar-thumb {
+    border-radius: 10px;
+    background: rgba(var(--ejs-primary-color));
+}
+
+.ejs_parent ::-webkit-scrollbar-track {
+    border-radius: 10px;
+    background: rgba(64, 64, 64, 0.5)
+}
+
+.ejs_ad_iframe {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    z-index: 1;
+    transform: translate(-50%, -50%);
+}
+
+.ejs_ad_close {
+    cursor: pointer;
+}
+
+.ejs_ad_close:after {
+    content: "";
+    position: absolute;
+    border-left: 20px solid transparent;
+    border-right: 20px solid #a7a7a77d;
+    border-top: 20px solid #a7a7a77d;
+    border-bottom: 20px solid transparent;
+    right: 0;
+}
+
+.ejs_ad_close a {
+    right: 4px;
+    top: 4px;
+    position: absolute;
+    border: 0;
+    padding: 0;
+    width: 15px;
+    height: 15px;
+    z-index: 99;
+}
+
+.ejs_ad_close a:before {
+    content: "";
+    border-bottom: 1px solid #fff;
+    transform: rotate(45deg) translateY(-45%);
+    width: 15px;
+    height: 15px;
+    display: block;
+    position: absolute;
+    top: 0;
+    right: 0;
+}
+
+.ejs_ad_close a:after {
+    content: "";
+    border-bottom: 1px solid #fff;
+    width: 15px;
+    height: 15px;
+    display: block;
+    position: absolute;
+    right: 0;
+    background: transparent;
+    top: 0;
+    transform: rotate(-45deg) translateY(-50%) translateX(0);
+}
+
+.ejs_game {
+    width: inherit;
+    height: inherit;
+    background-color: var(--ejs-background-color);
+    cursor: default;
+    position: relative;
+    overflow: hidden;
+}
+
+.ejs_game_background {
+    background-image: var(--ejs-background-image);
+    background-size: contain;
+    background-position: center center;
+    background-repeat: no-repeat;
+    text-align: -webkit-auto;
+}
+
+.ejs_game_background_blur:before,
+.ejs_game_background_blur:after {
+    content: "";
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: var(--ejs-background-image);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+}
+
+.ejs_game_background_blur:before {
+    background-size: cover;
+    filter: blur(10px);
+    transform: scale(1.1);
+}
+
+.ejs_start_button {
+    position: absolute;
+    bottom: 65px;
+    left: 50%;
+    transform: translateX(-50%);
+    cursor: pointer;
+    box-sizing: inherit;
+    display: flex;
+    justify-content: center;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
+    font-size: 20px;
+    line-height: 45px;
+    text-transform: uppercase;
+    font-weight: bolder;
+    position: relative;
+    text-decoration: none;
+    width: fit-content;
+    padding-left: 40px;
+    padding-right: 40px;
+    white-space: nowrap;
+    height: 45px;
+    border: 0;
+    color: #fff !important;
+    border-radius: 35px;
+    text-align: center;
+    background-color: rgba(var(--ejs-primary-color), 1);
+    box-shadow: 0 0 0 0 #222, 0 0px 0px 0 #111, inset 0 0px 0px 0 rgba(250, 250, 250, 0.2), inset 0 0px 0px 0px rgba(0, 0, 0, 0.5);
+}
+
+.ejs_start_button_border {
+    border: 0.5px solid #333;
+}
+
+.ejs_start_button:active,
+.ejs_start_button:hover {
+    animation: ejs_start_button_pulse 2s infinite;
+}
+
+@keyframes ejs_start_button_pulse {
+    50% {
+        box-shadow: 0 0 0 0 #222, 0 3px 7px 0 #111, inset 0 1px 1px 0 rgba(250, 250, 250, 0.2), inset 0 0px 15px 1px rgba(0, 0, 0, 0.5);
+    }
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 #222, 0 0px 0px 0 #111, inset 0 0px 0px 0 rgba(250, 250, 250, 0.2), inset 0 0px 0px 0px rgba(0, 0, 0, 0.5);
+    }
+}
+
+.ejs_loading_text {
+    position: absolute;
+    bottom: 20px;
+    font-weight: 500;
+    left: 50%;
+    transform: translateX(-50%);
+    box-sizing: inherit;
+    font-size: 12px;
+    color: #bcbcbc;
+    text-align: center;
+    text-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+}
+
+.ejs_loading_text_2 {
+    position: absolute;
+    bottom: 5px;
+    font-weight: 500;
+    left: 50%;
+    transform: translateX(-50%);
+    box-sizing: inherit;
+    font-size: 10px;
+    color: #bcbcbc;
+    text-align: center;
+    text-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+}
+
+.ejs_loading_text_2 a {
+    color: rgba(var(--ejs-primary-color), 1);
+    text-decoration: none;
+}
+
+.ejs_loading_text_2 a:hover {
+    text-decoration: underline;
+}
+
+.ejs_loading_text_2 a:visited {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:active {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:link {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:focus {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:target {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:any-link {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:local-link {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:target-within {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:scope {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:current {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:past {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:future {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:playing {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:paused {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:seeking {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:buffering {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:stalled {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:muted {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:volume-locked {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:fullscreen {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:picture-in-picture {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:user-invalid {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:user-valid {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:blank {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:modal {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:popover-open {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:state() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:dir() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:lang() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:not() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:is() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:where() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:has() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:nth-child() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:nth-last-child() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:nth-of-type() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:nth-last-of-type() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:first-child {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:last-child {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:first-of-type {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:last-of-type {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:only-child {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:only-of-type {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:empty {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:root {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:scope {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:host {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:host() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a:host-context() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::before {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::after {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::first-line {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::first-letter {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::selection {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::backdrop {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::placeholder {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::marker {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::spelling-error {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::grammar-error {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::file-selector-button {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::view-transition {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::view-transition-group() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::view-transition-image-pair() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::view-transition-old() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::view-transition-new() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::cue {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::cue() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::part() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::slotted() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::highlight() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::target-text() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::details-content {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::scroll-marker {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::scroll-marker-group {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::scroll-button() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::scroll-next-button {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::scroll-prev-button {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::column {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::nth-column() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::nth-last-column() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::first-column {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::last-column {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::only-column {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::blank {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::current {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::current() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::past {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::future {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::playing {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::paused {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::seeking {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::buffering {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::stalled {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::muted {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::volume-locked {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::fullscreen {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::picture-in-picture {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::user-invalid {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::user-valid {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::modal {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::popover-open {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::state() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::dir() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::lang() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::not() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::is() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::where() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::has() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::nth-child() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::nth-last-child() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::nth-of-type() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::nth-last-of-type() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::first-child {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::last-child {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::first-of-type {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::last-of-type {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::only-child {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::only-type {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::empty {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::root {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::scope {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::host {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::host() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::host-context() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::before {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::after {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::first-line {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::first-letter {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::selection {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::backdrop {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::placeholder {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::marker {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::spelling-error {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::grammar-error {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::file-selector-button {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::view-transition {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::view-transition-group() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::view-transition-image-pair() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::view-transition-old() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::view-transition-new() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::cue {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::cue() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::part() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::slotted() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::highlight() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::target-text() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::details-content {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::scroll-marker {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::scroll-marker-group {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::scroll-button() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::scroll-next-button {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::scroll-prev-button {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::column {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::nth-column() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::nth-last-column() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::first-column {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::last-column {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::only-column {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::blank {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::current {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::current() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::past {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::future {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::playing {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::paused {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::seeking {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::buffering {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::stalled {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::muted {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::volume-locked {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::fullscreen {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::picture-in-picture {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::user-invalid {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::user-valid {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::modal {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::popover-open {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::state() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::dir() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::lang() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::not() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::is() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::where() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::has() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::nth-child() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::nth-last-child() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::nth-of-type() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::nth-last-of-type() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::first-child {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::last-child {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::first-of-type {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::last-of-type {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::only-child {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::only-of-type {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::empty {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::root {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::scope {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::host {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::host() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::host-context() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::before {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::after {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::first-line {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::first-letter {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::selection {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::backdrop {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::placeholder {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::marker {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::spelling-error {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::grammar-error {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::file-selector-button {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::view-transition {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::view-transition-group() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::view-transition-image-pair() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::view-transition-old() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::view-transition-new() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::cue {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::cue() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::part() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::slotted() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::highlight() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::target-text() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::details-content {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::scroll-marker {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::scroll-marker-group {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::scroll-button() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::scroll-next-button {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::scroll-prev-button {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::column {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::nth-column() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::nth-last-column() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::first-column {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::last-column {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::only-column {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::blank {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::current {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::current() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::past {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::future {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::playing {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::paused {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::seeking {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::buffering {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::stalled {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::muted {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::volume-locked {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::fullscreen {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::picture-in-picture {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::user-invalid {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::user-valid {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::modal {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::popover-open {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::state() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::dir() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::lang() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::not() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::is() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::where() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::has() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::nth-child() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::nth-last-child() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::nth-of-type() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::nth-last-of-type() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::first-child {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::last-child {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::first-of-type {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::last-of-type {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::only-child {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::only-of-type {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::empty {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::root {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::scope {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::host {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::host() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::host-context() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::before {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::after {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::first-line {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::first-letter {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::selection {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::backdrop {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::placeholder {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::marker {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::spelling-error {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::grammar-error {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::file-selector-button {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::view-transition {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::view-transition-group() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::view-transition-image-pair() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::view-transition-old() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::view-transition-new() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::cue {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::cue() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::part() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::slotted() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::highlight() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::target-text() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::details-content {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::scroll-marker {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::scroll-marker-group {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::scroll-button() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::scroll-next-button {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::scroll-prev-button {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::column {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::nth-column() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::nth-last-column() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::first-column {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::last-column {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::only-column {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::blank {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::current {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::current() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::past {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::future {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::playing {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::paused {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::seeking {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::buffering {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::stalled {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::muted {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::volume-locked {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::fullscreen {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::picture-in-picture {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::user-invalid {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::user-valid {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::modal {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::popover-open {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::state() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text_2 a::dir() {
+    color: rgba(var(--ejs-primary-color), 1);
+}
+
+.ejs_loading_text

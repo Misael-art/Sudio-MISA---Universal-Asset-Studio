@@ -21,7 +21,7 @@ Transforme gráficos de ROMs clássicas em assets editáveis e auditáveis. O Su
 - Reconstrução fiel “como no jogo”: plane/tiles/paletas/prioridade/scroll.
 - Análise visual: framebuffer real vs reconstrução (diff e pontuação).
 - Exporta PNG/JSON; Importa PNG+JSON e valida metadados.
-- Fallback via SaveState quando ponteiros diretos do core não estiverem disponíveis.
+  (Sem fallback por SaveState: apenas dados reais via ponteiros do core.)
 
 ## Arquitetura
 - UI/React + TypeScript + Vite
@@ -51,7 +51,7 @@ Abra `http://localhost:5173`.
 ## Fluxo de Emulação (EmulatorJS)
 - `useEmulator` carrega o core especificado e inicia o loop de captura.
 - Captura de framebuffer e ponteiros de memória via exports cwrap do core.
-- Fallback por SaveState quando necessário.
+  (Sem fallback por SaveState: apenas dados reais via ponteiros do core.)
 
 ### Diagnóstico e Logs (T+ms)
 - O hook instrumenta chamadas críticas com tempos relativos ao `loadRomFile` (T+ms):
@@ -90,10 +90,10 @@ Cwraps esperados (MD):
 Consulte `.trae/documents/plano-implementacao-completo.md` (seção 0.3) para instruções de rebuild do core.
 
 ### Build do Core (Genesis Plus GX)
-- Script: `build-genesis-core.ps1` recompila o core com exports requeridos.
+- Script: `scripts/build-genesis-universal.ps1` recompila o core com exports requeridos.
 - Requer Docker Desktop ativo (padrão). Executar:
   ```powershell
-  ./build-genesis-core.ps1 -UseDocker $true
+  ./scripts/build-genesis-universal.ps1 -Clean
   ```
 - Valida a presença dos exports e instala artefatos em `public/emulatorjs-data/cores/`.
 
@@ -117,7 +117,7 @@ Consulte `.trae/documents/plano-implementacao-completo.md` (seção 0.3) para in
 - Critérios (etapas principais):
   - Core MD: exports “OK” no `CoreExportsPanel`
   - Adapter MD: diff < 5% em cenas de teste (Analyzer)
-  - SaveState: fallback funcional
+  - SaveState: desativado como fonte de dados para cumprir "Sem dados mock/simulados"
   - Multi-sistema: export/adapter/validação por sistema
 
 ## Contribuição

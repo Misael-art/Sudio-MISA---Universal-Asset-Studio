@@ -46,7 +46,6 @@ export const CoreExportsPanel: React.FC<CoreExportsPanelProps> = ({ system }) =>
       pushEntry(core.exports?.oamPtr, core.sizes?.oam);
       pushEntry(core.exports?.regsPtr, core.sizes?.regs);
       // MD SAT (quando houver no descritor)
-      // @ts-expect-error satPtr opcional por sistema
       pushEntry(core.exports?.satPtr, core.sizes?.sat);
       setRows(results);
     } catch {
@@ -59,11 +58,14 @@ export const CoreExportsPanel: React.FC<CoreExportsPanelProps> = ({ system }) =>
   return (
     <div className="bg-white rounded border p-3 mt-4">
       <div className="font-medium mb-2">Exports do Core (sondados)</div>
-      <div className="grid grid-cols-2 gap-1 text-sm">
+      <div className="grid grid-cols-3 gap-1 text-sm">
         {rows.map(r => (
-          <div key={r.name} className="flex justify-between">
+          <div key={r.name} className="contents">
             <span className="text-gray-700">{r.name}</span>
             <span className={r.present ? 'text-green-700' : 'text-red-700'}>{r.present ? 'OK' : 'Faltando'}</span>
+            <span className={!r.present ? 'text-gray-400' : r.sizeOk === true ? 'text-green-700' : r.sizeOk === false ? 'text-red-700' : 'text-gray-500'}>
+              {r.present ? (r.sizeOk === true ? 'tamanho OK' : r.sizeOk === false ? `tamanho inválido${r.expectedSize ? ` (${r.expectedSize} bytes)` : ''}` : (r.expectedSize ? `${r.expectedSize} bytes` : '')) : '-'}
+            </span>
           </div>
         ))}
       </div>

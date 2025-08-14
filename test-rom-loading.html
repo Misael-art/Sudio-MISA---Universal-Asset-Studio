@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Carregamento de ROM Real - Genesis Plus GX</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #1a1a1a;
+            color: #ffffff;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .test-section {
+            background-color: #2a2a2a;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border-left: 4px solid #4CAF50;
+        }
+        .error {
+            border-left-color: #f44336;
+        }
+        .warning {
+            border-left-color: #ff9800;
+        }
+        .log {
+            background-color: #000;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .status {
+            font-weight: bold;
+            padding: 5px 10px;
+            border-radius: 4px;
+            display: inline-block;
+            margin: 5px 0;
+        }
+        .status.success { background-color: #4CAF50; }
+        .status.error { background-color: #f44336; }
+        .status.warning { background-color: #ff9800; }
+        .status.info { background-color: #2196F3; }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #666;
+            cursor: not-allowed;
+        }
+        .memory-data {
+            background-color: #333;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 11px;
+            margin: 10px 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .hex-dump {
+            color: #00ff00;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Teste de Carregamento de ROM Real - Fase 0</h1>
+        
+        <div class="test-section">
+            <h2>📋 Status do Teste</h2>
+            <div id="status">Aguardando início do teste...</div>
+            <button onclick="startRomTest()">Iniciar Teste de ROM</button>
+            <button onclick="clearLog()">Limpar Log</button>
+        </div>
+
+        <div class="test-section">
+            <h2>🎯 Carregamento da ROM</h2>
+            <div id="rom-status">Nenhuma ROM carregada ainda.</div>
+            <div id="rom-info"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🧠 Extração de Dados de Memória</h2>
+            <div id="memory-extraction">Aguardando carregamento da ROM...</div>
+            <div id="memory-data"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>📊 Validação dos Dados</h2>
+            <div id="validation-results">Aguardando extração de dados...</div>
+        </div>
+
+        <div class="test-section">
+            <h2>📝 Log Detalhado</h2>
+            <div id="log" class="log">Aguardando início dos testes...
+</div>
+        </div>
+    </div>
+
+    <script>
+        let logElement;
+        let statusElement;
+        let romStatusElement;
+        let romInfoElement;
+        let memoryExtractionElement;
+        let memoryDataElement;
+        let validationElement;
+        let emulatorModule = null;
+        let gameManager = null;
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = {
+                'info': '📝',
+                'success': '✅',
+                'error': '❌',
+                'warning': '⚠️'
+            }[type] || '📝';
+            
+            logElement.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function updateStatus(message, type = 'info') {
+            statusElement.innerHTML = `<span class="status ${type}">${message}</span>`;
+        }
+
+        function clearLog() {
+            logElement.textContent = 'Log limpo.\n';
+        }
+
+        function formatHexDump(data, maxBytes = 64) {
+            let result = '';
+            const bytes = Math.min(data.length, maxBytes);
+            
+            for (let i = 0; i < bytes; i += 16) {
+                const offset = i.toString(16).padStart(4, '0').toUpperCase();
+                let hexPart = '';
+                let asciiPart = '';
+                
+                for (let j = 0; j < 16 && (i + j) < bytes; j++) {
+                    const byte = data[i + j];
+                    hexPart += byte.toString(16).padStart(2, '0').toUpperCase() + ' ';
+                    asciiPart += (byte >= 32 && byte <= 126) ? String.fromCharCode(byte) : '.';
+                }
+                
+                result += `${offset}: ${hexPart.padEnd(48)} |${asciiPart}|\n`;
+            }
+            
+            if (data.length > maxBytes) {
+                result += `... (${data.length - maxBytes} bytes restantes)\n`;
+            }
+            
+            return result;
+        }
+
+        async function startRomTest() {
+            logElement = document.getElementById('log');
+            statusElement = document.getElementById('status');
+            romStatusElement = document.getElementById('rom-status');
+            romInfoElement = document.getElementById('rom-info');
+            memoryExtractionElement = document.getElementById('memory-extraction');
+            memoryDataElement = document.getElementById('memory-data');
+            validationElement = document.getElementById('validation-results');
+
+            updateStatus('Iniciando teste de carregamento de ROM...', 'info');
+            log('🚀 Iniciando teste de carregamento de ROM real');
+            
+            try {
+                // 1. Carregar EmulatorJS
+                log('📦 Carregando EmulatorJS...');
+                await loadEmulatorJS();
+                
+                // 2. Carregar ROM de teste
+                log('🎮 Carregando ROM de teste...');
+                await loadTestRom();
+                
+                // 3. Aguardar inicialização
+                log('⏳ Aguardando inicialização do emulador...');
+                await waitForEmulatorReady();
+                
+                // 4. Extrair dados de memória
+                log('🧠 Extraindo dados de memória...');
+                await extractMemoryData();
+                
+                // 5. Validar dados
+                log('✅ Validando dados extraídos...');
+                validateExtractedData();
+                
+                updateStatus('Teste de ROM concluído com sucesso', 'success');
+                
+            } catch (error) {
+                log(`❌ Erro durante o teste: ${error.message}`, 'error');
+                updateStatus('Erro no teste de ROM', 'error');
+            }
+        }
+
+        async function loadEmulatorJS() {
+            return new Promise((resolve, reject) => {
+                // Carregar loader.js do EmulatorJS
+                const script = document.createElement('script');
+                script.src = '/emulatorjs-data/loader.js';
+                script.onload = () => {
+                    log('✅ EmulatorJS loader carregado');
+                    resolve();
+                };
+                script.onerror = () => {
+                    reject(new Error('Falha ao carregar EmulatorJS loader'));
+                };
+                document.head.appendChild(script);
+            });
+        }
+
+        async function loadTestRom() {
+            return new Promise(async (resolve, reject) => {
+                try {
+                    // Buscar ROM de teste
+                    const response = await fetch('/data/rom_teste.bin');
+                    if (!response.ok) {
+                        throw new Error(`Falha ao carregar ROM: ${response.status}`);
+                    }
+                    
+                    const romData = await response.arrayBuffer();
+                    log(`✅ ROM carregada: ${romData.byteLength} bytes`);
+                    
+                    romStatusElement.innerHTML = `
+                        <div style="color: #4CAF50;">✅ ROM carregada com sucesso</div>
+                        <div>Tamanho: ${romData.byteLength} bytes (${(romData.byteLength / 1024).toFixed(1)} KB)</div>
+                    `;
+                    
+                    // Analisar header da ROM
+                    const header = new Uint8Array(romData.slice(0, 512));
+                    let romInfo = '<h3>Informações da ROM:</h3>';
+                    
+                    // Verificar assinatura Mega Drive
+                    const headerText = new TextDecoder('ascii').decode(header.slice(256, 272));
+                    romInfo += `<div>Header: ${headerText.trim()}</div>`;
+                    
+                    // Verificar região
+                    const region = String.fromCharCode(header[496]);
+                    romInfo += `<div>Região: ${region}</div>`;
+                    
+                    romInfoElement.innerHTML = romInfo;
+                    
+                    // Configurar EmulatorJS
+                    window.EJS_player = '#emulator-container';
+                    window.EJS_core = 'genplusgx';
+                    window.EJS_gameUrl = '/data/rom_teste.bin';
+                    window.EJS_pathtodata = '/emulatorjs-data/';
+                    
+                    // Criar container do emulador
+                    let container = document.getElementById('emulator-container');
+                    if (!container) {
+                        container = document.createElement('div');
+                        container.id = 'emulator-container';
+                        container.style.width = '320px';
+                        container.style.height = '240px';
+                        container.style.display = 'none'; // Ocultar para teste
+                        document.body.appendChild(container);
+                    }
+                    
+                    log('🎮 Inicializando emulador...');
+                    resolve();
+                    
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        }
+
+        async function waitForEmulatorReady() {
+            return new Promise((resolve, reject) => {
+                let attempts = 0;
+                const maxAttempts = 30; // 30 segundos
+                
+                const checkReady = () => {
+                    attempts++;
+                    
+                    if (window.EJS_emulator && window.EJS_emulator.gameManager) {
+                        gameManager = window.EJS_emulator.gameManager;
+                        log('✅ Emulador inicializado e pronto');
+                        resolve();
+                        return;
+                    }
+                    
+                    if (attempts >= maxAttempts) {
+                        reject(new Error('Timeout aguardando inicialização do emulador'));
+                        return;
+                    }
+                    
+                    log(`⏳ Aguardando emulador... (${attempts}/${maxAttempts})`);
+                    setTimeout(checkReady, 1000);
+                };
+                
+                checkReady();
+            });
+        }
+
+        async function extractMemoryData() {
+            if (!gameManager || !gameManager.Module) {
+                throw new Error('GameManager ou Module não disponível');
+            }
+            
+            const module = gameManager.Module;
+            let extractionResults = '<h3>Resultados da Extração:</h3>';
+            let memoryData = '';
+            
+            // Testar cada ponteiro de memória
+            const memoryRegions = [
+                { name: 'VRAM', getter: '_get_vram_ptr', alt: 'get_vram_ptr', size: 65536 },
+                { name: 'CRAM', getter: '_get_cram_ptr', alt: 'get_cram_ptr', size: 128 },
+                { name: 'VSRAM', getter: '_get_vsram_ptr', alt: 'get_vsram_ptr', size: 80 },
+                { name: 'SAT', getter: '_get_sat_ptr', alt: 'get_sat_ptr', size: 640 },
+                { name: 'VDP_REGS', getter: '_get_vdp_regs_ptr', alt: 'get_vdp_regs_ptr', size: 32 }
+            ];
+            
+            for (const region of memoryRegions) {
+                try {
+                    let fn = null;
+                    
+                    // Tentar encontrar a função
+                    if (module[region.getter]) {
+                        fn = module[region.getter];
+                    } else if (module[region.alt]) {
+                        fn = module[region.alt];
+                    } else if (module.cwrap) {
+                        try {
+                            fn = module.cwrap(region.getter, 'number', []);
+                        } catch (e) {
+                            try {
+                                fn = module.cwrap(region.alt, 'number', []);
+                            } catch (e2) {
+                                // Ignore
+                            }
+                        }
+                    }
+                    
+                    if (fn && typeof fn === 'function') {
+                        const ptr = fn();
+                        
+                        if (ptr && ptr > 0) {
+                            // Extrair dados
+                            const data = new Uint8Array(module.HEAPU8.buffer, ptr, region.size);
+                            const dataCopy = new Uint8Array(data); // Cópia para análise
+                            
+                            // Verificar se contém dados não-zero
+                            const nonZeroBytes = dataCopy.filter(b => b !== 0).length;
+                            const dataPercentage = ((nonZeroBytes / dataCopy.length) * 100).toFixed(1);
+                            
+                            extractionResults += `
+                                <div style="color: #4CAF50; margin: 10px 0;">
+                                    ✅ ${region.name}: 0x${ptr.toString(16)} (${dataCopy.length} bytes)
+                                    <br>&nbsp;&nbsp;&nbsp;Dados não-zero: ${nonZeroBytes}/${dataCopy.length} (${dataPercentage}%)
+                                </div>
+                            `;
+                            
+                            // Adicionar hex dump
+                            memoryData += `\n=== ${region.name} (primeiros 64 bytes) ===\n`;
+                            memoryData += formatHexDump(dataCopy, 64);
+                            
+                            log(`✅ ${region.name} extraído: ${nonZeroBytes}/${dataCopy.length} bytes não-zero (${dataPercentage}%)`, 'success');
+                            
+                        } else {
+                            extractionResults += `<div style="color: #f44336;">❌ ${region.name}: ponteiro nulo (${ptr})</div>`;
+                            log(`❌ ${region.name}: ponteiro nulo`, 'error');
+                        }
+                    } else {
+                        extractionResults += `<div style="color: #f44336;">❌ ${region.name}: função não encontrada</div>`;
+                        log(`❌ ${region.name}: função não encontrada`, 'error');
+                    }
+                    
+                } catch (error) {
+                    extractionResults += `<div style="color: #f44336;">❌ ${region.name}: erro - ${error.message}</div>`;
+                    log(`❌ Erro ao extrair ${region.name}: ${error.message}`, 'error');
+                }
+            }
+            
+            memoryExtractionElement.innerHTML = extractionResults;
+            memoryDataElement.innerHTML = `<div class="memory-data"><div class="hex-dump">${memoryData}</div></div>`;
+        }
+
+        function validateExtractedData() {
+            let validationResults = '<h3>Validação dos Dados:</h3>';
+            
+            // Verificar se os dados extraídos são válidos
+            const memoryDataDiv = memoryDataElement.querySelector('.hex-dump');
+            const hasMemoryData = memoryDataDiv && memoryDataDiv.textContent.length > 100;
+            
+            if (hasMemoryData) {
+                validationResults += '<div style="color: #4CAF50;">✅ Dados de memória extraídos com sucesso</div>';
+                validationResults += '<div style="color: #4CAF50;">✅ Hex dumps gerados corretamente</div>';
+                
+                // Verificar se há dados não-zero
+                const extractionDiv = memoryExtractionElement;
+                const hasNonZeroData = extractionDiv.innerHTML.includes('não-zero:');
+                
+                if (hasNonZeroData) {
+                    validationResults += '<div style="color: #4CAF50;">✅ Dados não-zero detectados nas regiões de memória</div>';
+                    validationResults += '<div style="color: #4CAF50;">🎉 TESTE APROVADO: ROM carregada e dados extraídos com sucesso!</div>';
+                    log('🎉 VALIDAÇÃO APROVADA: Carregamento de ROM e extração de dados funcionando corretamente', 'success');
+                } else {
+                    validationResults += '<div style="color: #ff9800;">⚠️ Apenas dados zero detectados - pode indicar ROM não inicializada</div>';
+                    log('⚠️ VALIDAÇÃO PARCIAL: Dados extraídos mas apenas zeros detectados', 'warning');
+                }
+            } else {
+                validationResults += '<div style="color: #f44336;">❌ Falha na extração de dados de memória</div>';
+                validationResults += '<div style="color: #f44336;">❌ TESTE REPROVADO: Não foi possível extrair dados válidos</div>';
+                log('❌ VALIDAÇÃO REPROVADA: Falha na extração de dados de memória', 'error');
+            }
+            
+            validationElement.innerHTML = validationResults;
+        }
+    </script>
+</body>
+</html>

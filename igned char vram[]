@@ -1,0 +1,10 @@
+bcd8a00 2025-08-11 10:34:37 -0300 SudioMisa feat(build): aceitar -SourcePath e montar fonte real no container; preparar para compilar genesis-plus-gx real
+a64d9e3 2025-08-11 10:00:10 -0300 SudioMisa fix(test): fallback para carregar emulator.min.js e instanciar manualmente se loader não inicializar EJS_emulator
+484fd2d 2025-08-11 09:52:15 -0300 SudioMisa fix(test): usar instância criada pelo loader.js (não reinicializar EmulatorJS)
+064e846 2025-08-11 09:43:32 -0300 SudioMisa feat(test): adicionar test-genesis-emulator.html para validar exports do core e métricas de boot
+a1879bf 2025-08-11 07:54:12 -0300 SudioMisa docs: atualizar README com fluxo T+ms, build do core e diagnóstico; add TESTE_RESULTADOS.md
+2545abb 2025-08-10 13:50:06 -0300 SudioMisa build: adicionar scripts de link (sh/bat) e README de automação para cores com Emscripten/Docker
+07eddc1 2025-08-10 13:43:05 -0300 SudioMisa build(genesis): adicionar arquivo de exports C (Emscripten) para ponteiros VRAM/CRAM/VSRAM/VDP/SAT/framebuffer
+4575dff 2025-08-09 22:34:53 -0300 SudioMisa chore(repo): adicionar arquivos faltantes para garantir coesão e completude do projeto
+d0ddaa3 2025-08-09 22:33:00 -0300 SudioMisa feat(useEmulator): fallback de dimensões a partir do canvas do emulador quando getVideoDimensions não disponível
+a050143 2025-08-09 22:30:53 -0300 SudioMisa docs(todo): marcar documentação de símbolos/tamanhos e instruções de exports como concluída

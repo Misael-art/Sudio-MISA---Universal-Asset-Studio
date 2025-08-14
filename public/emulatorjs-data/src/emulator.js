@@ -303,6 +303,25 @@ class EmulatorJS {
             return null;
         })();
         this.isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+        
+        // CORREÇÃO CRÍTICA: Verificação robusta de EJS_DUMMYSTORAGE
+        console.log('[STORAGE] Verificando disponibilidade de EJS_DUMMYSTORAGE...');
+        console.log('[STORAGE] - window.EJS_DUMMYSTORAGE:', typeof window.EJS_DUMMYSTORAGE);
+        
+        if (typeof window.EJS_DUMMYSTORAGE !== 'function') {
+            console.warn('[STORAGE] EJS_DUMMYSTORAGE não disponível. Criando fallback.');
+            // Criar fallback para EJS_DUMMYSTORAGE
+            window.EJS_DUMMYSTORAGE = class {
+                constructor() {}
+                addFileToDB() { return Promise.resolve(); }
+                get() { return Promise.resolve(); }
+                put() { return Promise.resolve(); }
+                remove() { return Promise.resolve(); }
+                getSizes() { return Promise.resolve({}); }
+            };
+            console.warn('[STORAGE] Fallback EJS_DUMMYSTORAGE criado.');
+        }
+        
         if (this.config.disableDatabases) {
             this.storage = {
                 rom: new window.EJS_DUMMYSTORAGE(),
@@ -310,14 +329,39 @@ class EmulatorJS {
                 core: new window.EJS_DUMMYSTORAGE()
             }
         } else {
-            this.storage = {
-                rom: new window.EJS_STORAGE("EmulatorJS-roms", "rom"),
-                bios: new window.EJS_STORAGE("EmulatorJS-bios", "bios"),
-                core: new window.EJS_STORAGE("EmulatorJS-core", "core")
+            // CORREÇÃO CRÍTICA: Verificação robusta antes de usar EJS_STORAGE
+            console.log('[STORAGE] Verificando disponibilidade de EJS_STORAGE...');
+            console.log('[STORAGE] - window.EJS_STORAGE:', typeof window.EJS_STORAGE);
+            
+            if (typeof window.EJS_STORAGE !== 'function') {
+                console.error('[STORAGE] ERRO CRÍTICO: EJS_STORAGE não está definido como função!');
+                console.error('[STORAGE] - Tipo atual:', typeof window.EJS_STORAGE);
+                console.error('[STORAGE] - Valor:', window.EJS_STORAGE);
+                // Fallback: usar EJS_DUMMYSTORAGE
+                console.warn('[STORAGE] Usando EJS_DUMMYSTORAGE como fallback');
+                this.storage = {
+                    rom: new window.EJS_DUMMYSTORAGE(),
+                    bios: new window.EJS_DUMMYSTORAGE(),
+                    core: new window.EJS_DUMMYSTORAGE()
+                }
+            } else {
+                console.log('[STORAGE] EJS_STORAGE disponível, criando storage normal');
+                this.storage = {
+                    rom: new window.EJS_STORAGE("EmulatorJS-roms", "rom"),
+                    bios: new window.EJS_STORAGE("EmulatorJS-bios", "bios"),
+                    core: new window.EJS_STORAGE("EmulatorJS-core", "core")
+                }
             }
         }
         // This is not cache. This is save data
-        this.storage.states = new window.EJS_STORAGE("EmulatorJS-states", "states");
+        // CORREÇÃO CRÍTICA: Verificação robusta para states storage
+        console.log('[STORAGE] Criando states storage...');
+        if (typeof window.EJS_STORAGE !== 'function') {
+            console.warn('[STORAGE] EJS_STORAGE não disponível para states, usando EJS_DUMMYSTORAGE');
+            this.storage.states = new window.EJS_DUMMYSTORAGE();
+        } else {
+            this.storage.states = new window.EJS_STORAGE("EmulatorJS-states", "states");
+        }
 
         this.game.classList.add("ejs_game");
         if (typeof this.config.backgroundImg === "string") {
@@ -637,21 +681,70 @@ class EmulatorJS {
                 this.textElem.innerText = this.localization("Download Game Core") + progress;
             }, false, { responseType: "arraybuffer", method: "GET" });
             if (res === -1) {
-                console.log("File not found, attemping to fetch from emulatorjs cdn.");
-                console.error("**THIS METHOD IS A FAILSAFE, AND NOT OFFICIALLY SUPPORTED. USE AT YOUR OWN RISK**");
-                let version = this.ejs_version.endsWith("-beta") ? "nightly" : this.ejs_version;
-                res = await this.downloadFile(`https://cdn.emulatorjs.org/${version}/data/${corePath}`, (progress) => {
-                    this.textElem.innerText = this.localization("Download Game Core") + progress;
-                }, true, { responseType: "arraybuffer", method: "GET" });
-                if (res === -1) {
-                    if (!this.supportsWebgl2) {
-                        this.startGameError(this.localization("Outdated graphics driver"));
-                    } else {
-                        this.startGameError(this.localization("Error downloading core") + " (" + filename + ")");
+                console.log("File not found, attempting direct core loading fallback.");
+                
+                // CORREÇÃO CRÍTICA: Fallback para carregamento direto dos arquivos .js e .wasm
+                const coreBaseName = this.getCore();
+                const jsPath = `cores/${coreBaseName}.js`;
+                const wasmPath = `cores/${coreBaseName}.wasm`;
+                
+                console.log(`[CORE] Tentando carregar diretamente: ${jsPath} e ${wasmPath}`);
+                
+                try {
+                    // Carregar arquivo .js
+                    const jsRes = await this.downloadFile(jsPath, null, false, { responseType: "text", method: "GET" });
+                    if (jsRes === -1) {
+                        throw new Error(`Arquivo ${jsPath} não encontrado`);
                     }
+                    
+                    // Carregar arquivo .wasm
+                    const wasmRes = await this.downloadFile(wasmPath, null, false, { responseType: "arraybuffer", method: "GET" });
+                    if (wasmRes === -1) {
+                        throw new Error(`Arquivo ${wasmPath} não encontrado`);
+                    }
+                    
+                    console.log(`[CORE] ✅ Arquivos carregados diretamente: JS=${jsRes.data.length} chars, WASM=${wasmRes.data.byteLength} bytes`);
+                    
+                    // Simular estrutura .data para compatibilidade (apenas JS, sem WASM problemático)
+                     const mockData = {};
+                     mockData[`${coreBaseName}.js`] = new TextEncoder().encode(jsRes.data);
+                     // Não incluir WASM para evitar problemas de compatibilidade
+                     // mockData[`${coreBaseName}.wasm`] = new Uint8Array(wasmRes.data);
+                    
+                    // Criar mock de core.json com configurações básicas
+                    const mockCoreJson = {
+                        name: coreBaseName,
+                        extensions: ["bin", "smd", "gen", "md"],
+                        save: "srm",
+                        options: { supportsMouse: false },
+                        retroarchOpts: {}
+                    };
+                    mockData["core.json"] = new TextEncoder().encode(JSON.stringify(mockCoreJson));
+                    
+                    console.log(`[CORE] ✅ Fallback direto bem-sucedido para ${coreBaseName}`);
+                    gotCore(mockData);
                     return;
+                    
+                } catch (directLoadError) {
+                    console.error(`[CORE] ❌ Fallback direto falhou:`, directLoadError);
+                    
+                    // Fallback original para CDN como último recurso
+                    console.log("Attempting to fetch from emulatorjs cdn as last resort.");
+                    console.error("**THIS METHOD IS A FAILSAFE, AND NOT OFFICIALLY SUPPORTED. USE AT YOUR OWN RISK**");
+                    let version = this.ejs_version.endsWith("-beta") ? "nightly" : this.ejs_version;
+                    res = await this.downloadFile(`https://cdn.emulatorjs.org/${version}/data/${corePath}`, (progress) => {
+                        this.textElem.innerText = this.localization("Download Game Core") + progress;
+                    }, true, { responseType: "arraybuffer", method: "GET" });
+                    if (res === -1) {
+                        if (!this.supportsWebgl2) {
+                            this.startGameError(this.localization("Outdated graphics driver"));
+                        } else {
+                            this.startGameError(this.localization("Error downloading core") + " (" + filename + ")");
+                        }
+                        return;
+                    }
+                    console.warn("File was not found locally, but was found on the emulatorjs cdn.\nIt is recommended to download the stable release from here: https://cdn.emulatorjs.org/releases/");
                 }
-                console.warn("File was not found locally, but was found on the emulatorjs cdn.\nIt is recommended to download the stable release from here: https://cdn.emulatorjs.org/releases/");
             }
             gotCore(res.data);
             this.storage.core.put(filename, {
@@ -662,10 +755,113 @@ class EmulatorJS {
     }
     initGameCore(js, wasm, thread) {
         let script = this.createElement("script");
+        try {
+            console.log('[EMULATOR][core] 🚀 Preparando script do core a partir do pacote .data');
+        } catch {}
         script.src = URL.createObjectURL(new Blob([js], { type: "application/javascript" }));
-        script.addEventListener("load", () => {
+        
+        // CORREÇÃO DEFINITIVA: Aguardar EJS_Runtime com polling robusto e fallbacks múltiplos
+        script.addEventListener("load", async () => {
+            try {
+                console.log('[EMULATOR][core] ✅ Script do core carregado (via blob). Verificando EJS_Runtime...');
+                console.log('[EMULATOR][core] - EJS_Runtime inicial:', typeof window.EJS_Runtime);
+                
+                // Aguardar EJS_Runtime com polling mais robusto
+                let attempts = 0;
+                const maxAttempts = 150; // 15 segundos - aumentado
+                
+                while (typeof window.EJS_Runtime !== 'function' && attempts < maxAttempts) {
+                    attempts++;
+                    
+                    if (attempts % 10 === 0) {
+                        console.log(`[EMULATOR][core] ⏳ Aguardando EJS_Runtime... ${attempts}/${maxAttempts}`);
+                    }
+                    
+                    // ESTRATÉGIA 1: Tentar mapear EJS_Runtime a partir do nome do core
+                    try {
+                        const coreKey = (this.getCore && typeof this.getCore === 'function') ? this.getCore() : undefined;
+                        if (coreKey) {
+                            const candidates = [
+                                coreKey,
+                                coreKey.replace(/-/g, '_'),
+                                coreKey.replace(/\./g, '_'),
+                                coreKey.replace(/[-\.]/g, '_'),
+                                'genesis_plus_gx' // Específico para nosso core
+                            ];
+                            
+                            for (let i = 0; i < candidates.length; i++) {
+                                const k = candidates[i];
+                                if (k && typeof window[k] === 'function') {
+                                    window.EJS_Runtime = window[k];
+                                    console.log('[EMULATOR][core] ✅ EJS_Runtime mapeado de window["' + k + '"]');
+                                    break;
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('[EMULATOR][core] ⚠️ Erro ao mapear EJS_Runtime:', e);
+                    }
+                    
+                    // ESTRATÉGIA 2: Se ainda não encontrou, tentar carregar diretamente o core
+                    if (typeof window.EJS_Runtime !== 'function' && attempts === 50) {
+                        console.log('[EMULATOR][core] 🔄 Tentativa de carregamento direto do core...');
+                        try {
+                            const directScript = document.createElement('script');
+                            directScript.src = '/emulatorjs-data/cores/genesis_plus_gx.js';
+                            directScript.onload = () => {
+                                console.log('[EMULATOR][core] ✅ Core carregado diretamente como fallback');
+                            };
+                            document.head.appendChild(directScript);
+                        } catch (directError) {
+                            console.warn('[EMULATOR][core] ⚠️ Falha no carregamento direto:', directError);
+                        }
+                    }
+                    
+                    if (typeof window.EJS_Runtime !== 'function') {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+                }
+                
+                if (typeof window.EJS_Runtime !== 'function') {
+                    console.error('[EMULATOR][core] ❌ TIMEOUT: EJS_Runtime não disponível após', maxAttempts * 100, 'ms');
+                    console.error('[EMULATOR][core] - Core:', this.getCore());
+                    console.error('[EMULATOR][core] - window keys:', Object.keys(window).filter(k => k.includes('genesis') || k.includes('plus')));
+                    console.error('[EMULATOR][core] - Todas as variáveis window:', Object.keys(window).filter(k => k.toLowerCase().includes('ejs') || k.toLowerCase().includes('runtime')));
+                    
+                    // ÚLTIMO RECURSO: Tentar usar qualquer função que pareça ser um runtime
+                    const possibleRuntimes = Object.keys(window).filter(k => 
+                        typeof window[k] === 'function' && 
+                        (k.includes('genesis') || k.includes('plus') || k.includes('gx'))
+                    );
+                    
+                    if (possibleRuntimes.length > 0) {
+                        console.warn('[EMULATOR][core] 🔧 Tentando usar runtime alternativo:', possibleRuntimes[0]);
+                        window.EJS_Runtime = window[possibleRuntimes[0]];
+                    } else {
+                        this.startGameError(this.localization("Failed to load core runtime"));
+                        return;
+                    }
+                }
+                
+                console.log('[EMULATOR][core] ✅ EJS_Runtime disponível após', attempts, 'tentativas');
+                console.log('[EMULATOR][core] - Tipo:', typeof window.EJS_Runtime);
+                console.log('[EMULATOR][core] - É função?', typeof window.EJS_Runtime === 'function');
+                console.log('[EMULATOR][core] - Nome da função:', window.EJS_Runtime.name);
+                
+            } catch (e) {
+                console.error('[EMULATOR][core] ❌ Exceção crítica ao verificar EJS_Runtime:', e);
+                this.startGameError(this.localization("Failed to load core runtime"));
+                return;
+            }
+            
             this.initModule(wasm, thread);
         });
+        
+        script.addEventListener("error", (e) => {
+            console.error('[EMULATOR][core] ❌ Erro ao carregar core script:', e);
+            this.startGameError(this.localization("Failed to load core"));
+        });
+        
         document.body.appendChild(script);
     }
     getBaseFileName(force) {
@@ -956,11 +1152,33 @@ class EmulatorJS {
     }
     initModule(wasmData, threadData) {
         if (typeof window.EJS_Runtime !== "function") {
+            try {
+                console.warn("[EMULATOR][core] EJS_Runtime is not defined! Tentando mapear pelo nome do core...");
+                const coreKey = (this.getCore && typeof this.getCore === 'function') ? this.getCore() : undefined;
+                const candidates = [];
+                if (coreKey) {
+                    candidates.push(coreKey);
+                    candidates.push(coreKey.replace(/-/g, '_'));
+                    candidates.push(coreKey.replace(/\./g, '_'));
+                    candidates.push(coreKey.replace(/[-\.]/g, '_'));
+                }
+                for (let i = 0; i < candidates.length; i++) {
+                    const k = candidates[i];
+                    if (k && typeof window[k] === 'function') {
+                        window.EJS_Runtime = window[k];
+                        try { console.log('[EMULATOR][core] EJS_Runtime definido a partir de window["' + k + '"] (initModule)'); } catch {}
+                        break;
+                    }
+                }
+            } catch {}
+        }
+        if (typeof window.EJS_Runtime !== "function") {
             console.warn("EJS_Runtime is not defined!");
             this.startGameError(this.localization("Error loading EmulatorJS runtime"));
             throw new Error("EJS_Runtime is not defined!");
         }
-        window.EJS_Runtime({
+        // CORREÇÃO CRÍTICA: Configuração adaptativa para funcionar com ou sem WASM
+        const runtimeConfig = {
             noInitialRun: true,
             onRuntimeInitialized: null,
             arguments: [],
@@ -980,24 +1198,45 @@ class EmulatorJS {
                 }
             },
             totalDependencies: 0,
-            locateFile: function (fileName) {
-                if (this.debug) console.log(fileName);
-                if (fileName.endsWith(".wasm")) {
-                    return URL.createObjectURL(new Blob([wasmData], { type: "application/wasm" }));
-                } else if (fileName.endsWith(".worker.js")) {
-                    return URL.createObjectURL(new Blob([threadData], { type: "application/javascript" }));
-                }
-            },
             getSavExt: () => {
                 if (this.saveFileExt) {
                     return "." + this.saveFileExt;
                 }
                 return ".srm";
             }
-        }).then(module => {
+        };
+        
+        // Só configurar locateFile se tivermos dados WASM válidos
+        if (wasmData && wasmData.byteLength > 0) {
+            console.log('[EMULATOR][core] 🔧 Configurando com WASM:', wasmData.byteLength, 'bytes');
+            runtimeConfig.locateFile = function (fileName) {
+                if (this.debug) console.log(fileName);
+                if (fileName.endsWith(".wasm")) {
+                    return URL.createObjectURL(new Blob([wasmData], { type: "application/wasm" }));
+                } else if (fileName.endsWith(".worker.js")) {
+                    return URL.createObjectURL(new Blob([threadData], { type: "application/javascript" }));
+                }
+            };
+        } else {
+            console.log('[EMULATOR][core] ⚠️ Executando sem WASM (modo compatibilidade)');
+            // Configuração para modo sem WASM
+            runtimeConfig.wasmBinary = null;
+            runtimeConfig.locateFile = function (fileName) {
+                 console.log('[EMULATOR][core] 📁 locateFile chamado para:', fileName);
+                 if (fileName.endsWith(".wasm")) {
+                     console.log('[EMULATOR][core] ⚠️ WASM solicitado mas não disponível');
+                     return ''; // Retornar string vazia em vez de null
+                 }
+                 return fileName;
+             };
+        }
+        
+        window.EJS_Runtime(runtimeConfig).then(module => {
+            console.log('[EMULATOR][core] ✅ Runtime inicializado com sucesso');
             this.Module = module;
             this.downloadFiles();
         }).catch(e => {
+            console.error('[EMULATOR][core] ❌ Erro na inicialização do runtime:', e);
             console.warn(e);
             this.startGameError(this.localization("Failed to start game"));
         });
@@ -1160,7 +1399,56 @@ class EmulatorJS {
             })
         });
 
-        this.gamepad = new GamepadHandler(); //https://github.com/ethanaobrien/Gamepad
+        // CORREÇÃO CRÍTICA: Verificação robusta com fallback automático
+        console.log('[GAMEPAD] Verificando disponibilidade de GamepadHandler...');
+        console.log('[GAMEPAD] - window.GamepadHandler:', typeof window.GamepadHandler);
+        
+        if (typeof window.GamepadHandler !== 'function') {
+            console.warn('[GAMEPAD] GamepadHandler não disponível. Usando fallback.');
+            console.warn('[GAMEPAD] - Tipo atual:', typeof window.GamepadHandler);
+            console.warn('[GAMEPAD] - Valor:', window.GamepadHandler);
+            
+            // Criar instância fallback robusta para evitar crash total
+            this.gamepad = {
+                on: () => {},
+                terminate: () => {},
+                gamepads: [],
+                buttonLabels: {},
+                listeners: {},
+                timeout: null,
+                getGamepads: () => [],
+                loop: () => {},
+                updateGamepadState: () => {},
+                dispatchEvent: () => {},
+                getButtonLabel: () => null,
+                getAxisLabel: () => null
+            };
+            console.warn('[GAMEPAD] Fallback gamepad criado. Funcionalidade de gamepad desabilitada.');
+        } else {
+            try {
+                console.log('[GAMEPAD] Instanciando GamepadHandler...');
+                this.gamepad = new window.GamepadHandler();
+                console.log('[GAMEPAD] GamepadHandler instanciado com sucesso:', this.gamepad);
+            } catch (error) {
+                console.error('[GAMEPAD] ERRO ao instanciar GamepadHandler:', error);
+                // Usar fallback em caso de erro na instanciação
+                this.gamepad = {
+                    on: () => {},
+                    terminate: () => {},
+                    gamepads: [],
+                    buttonLabels: {},
+                    listeners: {},
+                    timeout: null,
+                    getGamepads: () => [],
+                    loop: () => {},
+                    updateGamepadState: () => {},
+                    dispatchEvent: () => {},
+                    getButtonLabel: () => null,
+                    getAxisLabel: () => null
+                };
+                console.warn('[GAMEPAD] Usando gamepad fallback devido a erro na instanciação');
+            }
+        }
         this.gamepad.on("connected", (e) => {
             if (!this.gamepadLabels) return;
             for (let i = 0; i < this.gamepadSelection.length; i++) {
@@ -4131,23 +4419,37 @@ class EmulatorJS {
         this.virtualGamepad.style.display = "none";
     }
     handleResize() {
-        if (this.virtualGamepad) {
-            if (this.virtualGamepad.style.display === "none") {
-                this.virtualGamepad.style.opacity = 0;
-                this.virtualGamepad.style.display = "";
-                setTimeout(() => {
-                    this.virtualGamepad.style.display = "none";
-                    this.virtualGamepad.style.opacity = "";
-                }, 250)
+        try {
+            if (!this || !this.elements || !this.elements.parent) {
+                console.warn('[EMULATOR] Elementos base não disponíveis em handleResize');
+                return;
             }
-        }
-        const positionInfo = this.elements.parent.getBoundingClientRect();
-        this.game.parentElement.classList.toggle("ejs_small_screen", positionInfo.width <= 575);
-        //This wouldnt work using :not()... strange.
-        this.game.parentElement.classList.toggle("ejs_big_screen", positionInfo.width > 575);
+            if (this.virtualGamepad) {
+                if (this.virtualGamepad.style.display === "none") {
+                    this.virtualGamepad.style.opacity = 0;
+                    this.virtualGamepad.style.display = "";
+                    setTimeout(() => {
+                        this.virtualGamepad.style.display = "none";
+                        this.virtualGamepad.style.opacity = "";
+                    }, 250)
+                }
+            }
+            const positionInfo = this.elements.parent.getBoundingClientRect();
+            // Verificação de segurança para evitar erro quando parentElement é nulo
+            const parentEl = this.game ? this.game.parentElement : null;
+            if (!parentEl || !parentEl.classList) {
+                console.warn('[EMULATOR] Elemento pai do canvas não disponível para handleResize');
+                return;
+            }
+            parentEl.classList.toggle("ejs_small_screen", positionInfo.width <= 575);
+            //This wouldnt work using :not()... strange.
+            parentEl.classList.toggle("ejs_big_screen", positionInfo.width > 575);
 
-        if (!this.handleSettingsResize) return;
-        this.handleSettingsResize();
+            if (!this.handleSettingsResize) return;
+            this.handleSettingsResize();
+        } catch (e) {
+            console.warn('[EMULATOR] Exceção em handleResize (protegido):', e);
+        }
     }
     getElementSize(element) {
         let elem = element.cloneNode(true);

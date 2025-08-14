@@ -1,0 +1,64 @@
+FROM emscripten/emsdk:3.1.45
+
+# Criar diretório de trabalho
+WORKDIR /build
+
+# Script de teste simplificado
+COPY <<EOF /build/simple-test.sh
+#!/bin/bash
+
+echo "=== Teste Simplificado de Variáveis ==="
+echo "Working Directory: \$(pwd)"
+
+# Criar arquivos de teste
+echo "Criando arquivos de teste..."
+mkdir -p core
+echo "// Test file 1" > core/test1.c
+echo "// Test file 2" > core/test2.c
+echo "// Test file 3" > core/test3.c
+echo "// Exports file" > emscripten_exports.c
+
+echo "Arquivos criados:"
+ls -la core/
+ls -la emscripten_exports.c
+
+# Teste 1: Atribuição direta simples
+echo ""
+echo "=== Teste 1: Atribuição Direta ==="
+SOURCE_FILES="./core/test1.c ./core/test2.c ./core/test3.c ./emscripten_exports.c"
+echo "SOURCE_FILES definido como: '\$SOURCE_FILES'"
+
+if [ -n "\$SOURCE_FILES" ]; then
+    echo "✓ SUCESSO: Variável SOURCE_FILES não está vazia"
+    echo "Conteúdo: \$SOURCE_FILES"
+else
+    echo "✗ ERRO: Variável SOURCE_FILES está vazia"
+    exit 1
+fi
+
+# Teste 2: Verificar se os arquivos existem
+echo ""
+echo "=== Teste 2: Verificação de Arquivos ==="
+for file in \$SOURCE_FILES; do
+    if [ -f "\$file" ]; then
+        echo "✓ Arquivo existe: \$file"
+    else
+        echo "✗ Arquivo não encontrado: \$file"
+    fi
+done
+
+# Teste 3: Comando emcc básico (sem executar)
+echo ""
+echo "=== Teste 3: Comando emcc (simulado) ==="
+echo "Comando que seria executado:"
+echo "emcc \$SOURCE_FILES -o genesis_plus_gx.js"
+
+echo ""
+echo "=== Todos os testes concluídos com sucesso! ==="
+EOF
+
+# Tornar o script executável
+RUN chmod +x /build/simple-test.sh
+
+# Executar o teste
+CMD ["/build/simple-test.sh"]

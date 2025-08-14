@@ -1,23 +1,23 @@
-// Implementando o Pilar 1.7: SpriteEditor.tsx
-// Galeria de sprites extraídos - Componente crítico da Fase 1
-// Deve exibir sprites como ImageData com cores corretas
+// Implementando a Fase 2: SpriteEditor avançado com edição pixel-a-pixel
+// Este componente permite editar sprites extraídos do Genesis Plus GX
+// Seguindo as especificações da Fase 2 do Universal Asset Studio
 
-import React, { useState, useRef, useEffect } from 'react';
-import { Download, Search, Grid, List, ZoomIn, ZoomOut, Palette, CheckCircle, XCircle } from 'lucide-react';
-// import { AssembledSprite } from '../lib/decoders/MegaDriveSpriteAssembler'; // Removido - não existe mais
-// import { ProcessedMegaDriveData } from '../lib/cores/MegaDriveCore'; // Removido - não existe mais
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { Search, Grid, List, Download, ZoomIn, ZoomOut, Undo, Redo, Save, Palette, Brush, Eraser, Droplet, Square, FileImage, Grid3X3, Upload, FolderOpen, Plus } from 'lucide-react';
+import { validateSpriteDimensions, generateValidationReport, SpriteValidationResult } from '../tests/spriteValidation';
+import { DRAWING_TOOLS, DrawingTools, DrawingState, useDrawingState } from './DrawingTools';
+import ColorPalette from './ColorPalette';
+import { useCanvasEditor } from '../hooks/useCanvasEditor';
+import { useEditHistory } from '../hooks/useEditHistory';
+import PreviewPanel from './PreviewPanel';
+import SpriteGallery from './SpriteGallery';
+import ExportDialog from './ExportDialog';
+import ImportDialog from './ImportDialog';
+import ProjectDialog from './ProjectDialog';
+import { useAssetsStore, EditedSprite } from '../state/assets';
 
-// Tipos simplificados para compatibilidade
-interface AssembledSprite {
-  id: number;
-  imageData: ImageData;
-  width: number;
-  height: number;
-  attributes?: {
-    size: 'small' | 'medium' | 'large';
-    paletteIndex: number;
-  };
-}
+// Importando tipos do Genesis
+import { AssembledSprite } from '../types/genesis';
 
 interface ProcessedMegaDriveData {
   sprites: AssembledSprite[];
@@ -26,427 +26,584 @@ interface ProcessedMegaDriveData {
   metadata: {
     romName: string;
     timestamp: number;
-    totalTiles: number;
-    totalSprites: number;
-    totalPalettes: number;
-    processingTime: number;
   };
 }
-import { validateSpriteDimensions, generateValidationReport, SpriteValidationResult } from '../tests/spriteValidation';
 
 export interface SpriteEditorProps {
   data: ProcessedMegaDriveData | null;
   className?: string;
 }
 
-type ViewMode = 'grid' | 'list';
-type SortMode = 'id' | 'size' | 'palette';
-
-/**
- * Editor de Sprites com galeria de sprites extraídos
- * Componente crítico da Fase 1 que exibe sprites decodificados
- * com cores corretas usando ImageData
- */
-export const SpriteEditor: React.FC<SpriteEditorProps> = ({ data, className = '' }) => {
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
-  const [sortMode, setSortMode] = useState<SortMode>('id');
-  const [searchTerm, setSearchTerm] = useState('');
+const SpriteEditor: React.FC<SpriteEditorProps> = ({ data, className = '' }) => {
+  // Integração com Zustand store
+  const {
+    editedSprites,
+    isEditing: storeIsEditing,
+    editingSprite: storeEditingSprite,
+    currentProjectId,
+    spriteProjects,
+    addEditedSprite,
+    updateEditedSprite,
+    startEditing: storeStartEditing,
+    stopEditing: storeStopEditing,
+    saveCurrentEdit,
+    createProject,
+    loadProject,
+    saveProject
+  } = useAssetsStore();
+  
+  // Estados básicos da galeria
   const [selectedSprite, setSelectedSprite] = useState<AssembledSprite | null>(null);
-  const [scale, setScale] = useState(2);
+  const [zoom, setZoom] = useState(4);
   const [validationResults, setValidationResults] = useState<SpriteValidationResult[]>([]);
-  const [showValidation, setShowValidation] = useState(false);
+  
+  // Estados para edição avançada
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingSprite, setEditingSprite] = useState<ImageData | null>(null);
+  const [showPalette, setShowPalette] = useState(false);
+  const [showTools, setShowTools] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [exportMode, setExportMode] = useState<'single' | 'sheet'>('single');
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showProjectDialog, setShowProjectDialog] = useState(false);
+  
+  // Refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  // Executar validação quando sprites são carregados
-  useEffect(() => {
-    if (data && data.sprites && data.sprites.length > 0) {
-      const results = validateSpriteDimensions(data.sprites);
-      setValidationResults(results);
-      
-      // Log do relatório de validação
-      const report = generateValidationReport(results);
-      console.log('[SPRITE-VALIDATION]', report);
-    }
-  }, [data && data.sprites]);
-
-  // Filtra e ordena sprites
-  const filteredSprites = React.useMemo(() => {
-    if (!data || !data.sprites) return [];
-
-    let filtered = data.sprites;
-
-    // Filtro por busca
-    if (searchTerm) {
-      filtered = filtered.filter(sprite => 
-        (sprite.id ? sprite.id.toString() : `Sprite #${sprite.id || 'Unknown'}`).includes(searchTerm) ||
-        `${sprite.width}x${sprite.height}`.includes(searchTerm)
-      );
-    }
-
-    // Ordenação
-    filtered.sort((a, b) => {
-      switch (sortMode) {
-        case 'id':
-          return a.id - b.id;
-        case 'size': {
-          const sizeA = a.width * a.height;
-          const sizeB = b.width * b.height;
-          return sizeA - sizeB;
-        }
-        case 'palette':
-          return a.id - b.id; // Fallback para ID já que não temos paletteIndex
-        default:
-          return 0;
+  
+  // Estados para ferramentas de desenho
+  const drawingState = useDrawingState(selectedSprite?.imageData || null);
+  const editHistory = useEditHistory(editingSprite);
+  
+  // Canvas editor
+  const canvasEditor = useCanvasEditor({
+    imageData: editingSprite,
+    scale: zoom,
+    drawingState: drawingState.drawingState,
+    onImageDataChange: (newImageData) => {
+      setEditingSprite(newImageData);
+    },
+    onColorPick: (color) => {
+      drawingState.updateColor(color);
+    },
+    onHistorySave: (action) => {
+      if (editingSprite) {
+        editHistory.saveToHistory(editingSprite, action);
       }
-    });
-
-    return filtered;
-  }, [data && data.sprites, searchTerm, sortMode]);
-
-  // Renderiza sprite no canvas quando selecionado
+    }
+  });
+  
+  // Dados processados
+  const sprites = data?.sprites || [];
+  
+  // Validação de sprites
   useEffect(() => {
-    if (selectedSprite && canvasRef.current) {
+    if (sprites.length > 0) {
+      const results = validateSpriteDimensions(sprites);
+      setValidationResults(results);
+    }
+  }, [sprites]);
+  
+
+  
+  // Função para iniciar edição integrada com Zustand
+  const startEditing = useCallback((sprite: AssembledSprite) => {
+    // Cria cópia do ImageData para edição
+    const editData = new ImageData(
+      new Uint8ClampedArray(sprite.imageData.data),
+      sprite.width,
+      sprite.height
+    );
+    
+    // Adiciona sprite ao store como EditedSprite
+    const editedSpriteId = addEditedSprite({
+      originalIndex: sprite.id,
+      imageData: editData,
+      width: sprite.width,
+      height: sprite.height,
+      paletteIndex: sprite.paletteIndex || 0
+    });
+    
+    // Busca o sprite editado criado
+    const editedSprite = editedSprites.find(s => s.id === editedSpriteId);
+    if (editedSprite) {
+      storeStartEditing(editedSprite);
+    }
+    
+    setEditingSprite(editData);
+    setSelectedSprite(sprite);
+    setIsEditing(true);
+    setShowTools(true);
+    
+    // Inicializa histórico
+    editHistory.initializeHistory(editData);
+  }, [editHistory, addEditedSprite, editedSprites, storeStartEditing]);
+  
+  // Função para finalizar edição
+  const finishEditing = useCallback(() => {
+    storeStopEditing();
+    setIsEditing(false);
+    setEditingSprite(null);
+    setShowTools(false);
+    setShowPalette(false);
+    editHistory.clearHistory();
+  }, [editHistory, storeStopEditing]);
+  
+  // Função para salvar sprite editado
+  const saveEditedSprite = useCallback(() => {
+    if (!editingSprite || !storeEditingSprite) return;
+    
+    // Salva no store Zustand
+    updateEditedSprite(storeEditingSprite.id, editingSprite);
+    
+    // Salva no projeto atual se existir
+    if (currentProjectId) {
+      saveProject();
+    }
+    
+    console.log('Sprite editado salvo:', storeEditingSprite.id);
+    finishEditing();
+  }, [editingSprite, storeEditingSprite, updateEditedSprite, currentProjectId, saveProject, finishEditing]);
+  
+  // Função para abrir diálogo de exportação de sprite individual
+  const handleExportSprite = useCallback((sprite: AssembledSprite) => {
+    setSelectedSprite(sprite);
+    setExportMode('single');
+    setShowExportDialog(true);
+  }, []);
+  
+  // Função para abrir diálogo de exportação de sprite sheet
+  const handleExportSpriteSheet = useCallback(() => {
+    if (sprites.length === 0) return;
+    setExportMode('sheet');
+    setShowExportDialog(true);
+  }, [sprites]);
+  
+  // Função para importar sprites
+  const handleImportSprites = useCallback((importedSprites: AssembledSprite[]) => {
+    // Adiciona sprites importados ao store
+    importedSprites.forEach(sprite => {
+      addEditedSprite({
+        originalIndex: -1, // Marca como sprite importado
+        imageData: sprite.imageData,
+        width: sprite.width,
+        height: sprite.height,
+        paletteIndex: sprite.paletteIndex || 0
+      });
+    });
+    
+    // Salva no projeto atual se existir
+    if (currentProjectId) {
+      saveProject();
+    }
+    
+    console.log('Sprites importados:', importedSprites);
+    alert(`${importedSprites.length} sprite(s) importado(s) com sucesso!`);
+  }, [addEditedSprite, currentProjectId, saveProject]);
+  
+  // Função para criar novo projeto
+  const handleCreateProject = useCallback((name: string) => {
+    const projectId = createProject(name);
+    console.log('Projeto criado:', projectId);
+    setShowProjectDialog(false);
+  }, [createProject]);
+  
+  // Função para carregar projeto
+  const handleLoadProject = useCallback((projectId: string) => {
+    loadProject(projectId);
+    console.log('Projeto carregado:', projectId);
+  }, [loadProject]);
+  
+  // Função para salvar projeto atual
+  const handleSaveProject = useCallback(() => {
+    if (currentProjectId) {
+      saveProject();
+      console.log('Projeto salvo:', currentProjectId);
+    }
+  }, [currentProjectId, saveProject]);
+  
+  // Função para desfazer
+  const handleUndo = useCallback(() => {
+    const undoData = editHistory.undo();
+    if (undoData) {
+      setEditingSprite(undoData);
+    }
+  }, [editHistory]);
+  
+  // Função para refazer
+  const handleRedo = useCallback(() => {
+    const redoData = editHistory.redo();
+    if (redoData) {
+      setEditingSprite(redoData);
+    }
+  }, [editHistory]);
+  
+  // Renderiza canvas do sprite selecionado
+  useEffect(() => {
+    if (selectedSprite && canvasRef.current && !isEditing) {
       const canvas = canvasRef.current;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
-
-      // Ajusta tamanho do canvas
-      canvas.width = selectedSprite.width * scale;
-      canvas.height = selectedSprite.height * scale;
-
-      // Limpa canvas
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // Cria ImageData escalado
-      const scaledImageData = new ImageData(canvas.width, canvas.height);
       
-      // Escala pixel por pixel
-      for (let y = 0; y < selectedSprite.height; y++) {
-        for (let x = 0; x < selectedSprite.width; x++) {
-          const srcIndex = (y * selectedSprite.width + x) * 4;
-          const r = selectedSprite.imageData.data[srcIndex];
-          const g = selectedSprite.imageData.data[srcIndex + 1];
-          const b = selectedSprite.imageData.data[srcIndex + 2];
-          const a = selectedSprite.imageData.data[srcIndex + 3];
-
-          // Aplica escala
-          for (let sy = 0; sy < scale; sy++) {
-            for (let sx = 0; sx < scale; sx++) {
-              const destX = x * scale + sx;
-              const destY = y * scale + sy;
-              const destIndex = (destY * canvas.width + destX) * 4;
-              
-              scaledImageData.data[destIndex] = r;
-              scaledImageData.data[destIndex + 1] = g;
-              scaledImageData.data[destIndex + 2] = b;
-              scaledImageData.data[destIndex + 3] = a;
-            }
-          }
-        }
-      }
-
-      // Renderiza no canvas
-      ctx.putImageData(scaledImageData, 0, 0);
+      canvas.width = selectedSprite.width * zoom;
+      canvas.height = selectedSprite.height * zoom;
+      
+      ctx.imageSmoothingEnabled = false;
+      
+      // Cria canvas temporário para o ImageData original
+      const tempCanvas = document.createElement('canvas');
+      const tempCtx = tempCanvas.getContext('2d')!;
+      tempCanvas.width = selectedSprite.width;
+      tempCanvas.height = selectedSprite.height;
+      tempCtx.putImageData(selectedSprite.imageData, 0, 0);
+      
+      // Desenha escalado no canvas principal
+      ctx.drawImage(
+        tempCanvas,
+        0, 0, selectedSprite.width, selectedSprite.height,
+        0, 0, canvas.width, canvas.height
+      );
     }
-  }, [selectedSprite, scale]);
-
-  // Exporta sprite como PNG
-  const handleExportSprite = (sprite: AssembledSprite) => {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    canvas.width = sprite.width;
-    canvas.height = sprite.height;
-    ctx.putImageData(sprite.imageData, 0, 0);
-
-    canvas.toBlob((blob) => {
-      if (blob) {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `sprite_${sprite.id}.png`;
-        a.click();
-        URL.revokeObjectURL(url);
-      }
-    });
-  };
-
-  // Renderiza sprite em miniatura
-  const renderSpriteThumb = (sprite: AssembledSprite) => {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return '';
-
-    canvas.width = sprite.width;
-    canvas.height = sprite.height;
-    ctx.putImageData(sprite.imageData, 0, 0);
-    
-    return canvas.toDataURL();
-  };
-
-  if (!data) {
+  }, [selectedSprite, zoom, isEditing]);
+  
+  if (!data || sprites.length === 0) {
     return (
-      <div className={`text-center py-12 ${className}`}>
-        <div className="text-6xl mb-4">🎮</div>
-        <h3 className="text-xl font-semibold text-gray-700 mb-2">
-          Nenhuma ROM processada
-        </h3>
-        <p className="text-gray-500">
-          Carregue e processe uma ROM para ver os sprites extraídos
-        </p>
+      <div className={`bg-gray-900 border border-gray-700 rounded-lg p-6 ${className}`}>
+        <div className="text-center text-gray-400">
+          <Palette className="w-16 h-16 mx-auto mb-4 opacity-50" />
+          <h3 className="text-lg font-semibold mb-2">Nenhum Sprite Encontrado</h3>
+          <p>Carregue dados do Genesis Plus GX para visualizar sprites.</p>
+        </div>
       </div>
     );
   }
-
+  
   return (
-    <div className={`space-y-6 ${className}`}>
-      {/* Painel de Validação */}
-      {validationResults.length > 0 && (
-        <div className="w-full mb-4 p-3 bg-gray-50 rounded-lg border">
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="font-medium text-gray-700 flex items-center gap-2">
-              <CheckCircle className="w-4 h-4" />
-              Validação de Dimensões
-            </h4>
+    <div className={`bg-gray-900 border border-gray-700 rounded-lg ${className}`}>
+      {/* Cabeçalho */}
+      <div className="border-b border-gray-700 p-4">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-white">Editor de Sprites</h2>
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-gray-400">
+              {sprites.length} sprites
+            </span>
+            {data.metadata.romName && (
+              <span className="text-sm text-blue-400 font-mono">
+                {data.metadata.romName}
+              </span>
+            )}
+          </div>
+        </div>
+        
+        {/* Controles de projeto */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-2">
             <button
-              onClick={() => setShowValidation(!showValidation)}
-              className="text-sm text-blue-600 hover:text-blue-800"
+              onClick={() => setShowProjectDialog(true)}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded text-sm flex items-center space-x-1 transition-colors"
+              title="Novo Projeto"
             >
-              {showValidation ? 'Ocultar' : 'Mostrar'} Detalhes
+              <Plus className="w-4 h-4" />
+              <span>Projeto</span>
             </button>
+            
+            {spriteProjects.length > 0 && (
+              <select
+                value={currentProjectId || ''}
+                onChange={(e) => e.target.value && handleLoadProject(e.target.value)}
+                className="bg-gray-700 text-white px-2 py-1 rounded text-sm border border-gray-600"
+              >
+                <option value="">Selecionar projeto...</option>
+                {spriteProjects.map(project => (
+                  <option key={project.id} value={project.id}>
+                    {project.name} ({project.sprites.length} sprites)
+                  </option>
+                ))}
+              </select>
+            )}
+            
+            {currentProjectId && (
+              <button
+                onClick={handleSaveProject}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-sm flex items-center space-x-1 transition-colors"
+                title="Salvar Projeto"
+              >
+                <Save className="w-3 h-3" />
+              </button>
+            )}
           </div>
           
-          <div className="flex gap-4 text-sm">
-            {validationResults.map((result) => (
-              <div key={result.spriteId} className="flex items-center gap-1">
-                {result.isValid ? (
-                  <CheckCircle className="w-3 h-3 text-green-500" />
-                ) : (
-                  <XCircle className="w-3 h-3 text-red-500" />
-                )}
-                <span className={result.isValid ? 'text-green-700' : 'text-red-700'}>
-                  {result.name} #{result.spriteId}: {result.actualWidth}×{result.actualHeight}px
-                </span>
-              </div>
-            ))}
-          </div>
-          
-          {showValidation && (
-            <div className="mt-3 p-2 bg-white rounded border text-xs font-mono whitespace-pre-line">
-              {generateValidationReport(validationResults)}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Cabeçalho com controles */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800">
-            Galeria de Sprites
-          </h2>
-          <p className="text-gray-600">
-            {filteredSprites.length} sprites encontrados de {data.metadata.romName}
-          </p>
-        </div>
-
-        <div className="flex gap-2">
-          {/* Busca */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Buscar sprites..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
-          {/* Ordenação */}
-          <select
-            value={sortMode}
-            onChange={(e) => setSortMode(e.target.value as SortMode)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="id">ID</option>
-            <option value="size">Tamanho</option>
-            <option value="palette">Paleta</option>
-          </select>
-
-          {/* Modo de visualização */}
-          <div className="flex border border-gray-300 rounded-lg overflow-hidden">
+          {/* Controles principais */}
+          <div className="flex items-center space-x-3">
             <button
-              onClick={() => setViewMode('grid')}
-              className={`p-2 ${viewMode === 'grid' ? 'bg-blue-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              onClick={() => setShowImportDialog(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
             >
-              <Grid className="w-4 h-4" />
+              <Upload className="w-4 h-4" />
+              <span>Importar</span>
             </button>
             <button
-              onClick={() => setViewMode('list')}
-              className={`p-2 ${viewMode === 'list' ? 'bg-blue-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              onClick={handleExportSpriteSheet}
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
             >
-              <List className="w-4 h-4" />
+              <Grid3X3 className="w-4 h-4" />
+              <span>Exportar Sheet</span>
             </button>
           </div>
         </div>
       </div>
-
-      {/* Galeria de sprites */}
-      {filteredSprites.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">
-          <div className="text-4xl mb-4">🔍</div>
-          <p className="text-lg">Nenhum sprite encontrado</p>
-          <p className="text-sm">Tente ajustar os filtros de busca</p>
-        </div>
-      ) : (
-        <div className={
-          viewMode === 'grid' 
-            ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' 
-            : 'space-y-2'
-        }>
-          {filteredSprites.map((sprite) => (
-            <div
-              key={sprite.id}
-              onClick={() => setSelectedSprite(sprite)}
-              className={`
-                border rounded-lg p-3 cursor-pointer transition-all hover:shadow-md
-                ${selectedSprite && selectedSprite.id === sprite.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}
-                ${viewMode === 'list' ? 'flex items-center gap-4' : 'text-center'}
-              `}
+      
+      {/* Abas para sprites originais e editados */}
+      <div className="border-b border-gray-700 mb-4">
+        <div className="flex space-x-4">
+          <button
+            className="px-4 py-2 text-white border-b-2 border-blue-500 font-medium"
+          >
+            Sprites Originais ({sprites.length})
+          </button>
+          {editedSprites.length > 0 && (
+            <button
+              className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
             >
-              {/* Miniatura do sprite */}
-              <div className={`
-                bg-gray-100 rounded border-2 border-dashed border-gray-300 flex items-center justify-center
-                ${viewMode === 'grid' ? 'w-full h-20 mb-2' : 'w-16 h-16 flex-shrink-0'}
-              `}>
-                <img
-                  src={renderSpriteThumb(sprite)}
-                  alt={`Sprite ${sprite.id}`}
-                  className="max-w-full max-h-full pixelated"
-                  style={{ imageRendering: 'pixelated' }}
-                />
-              </div>
-
-              {/* Informações do sprite */}
-              <div className={viewMode === 'list' ? 'flex-1' : ''}>
-                <div className="font-medium text-gray-800">
-                  Sprite #{sprite.id}
-                </div>
-                <div className="text-xs text-gray-500 space-y-1">
-                  <div>{sprite.width}x{sprite.height}px</div>
-                  <div className="flex items-center gap-1">
-                    <Palette className="w-3 h-3" />
-                    Paleta {sprite.attributes?.paletteIndex || 0}
-                  </div>
-                  <div className="capitalize">{sprite.attributes?.size || 'medium'}</div>
-                </div>
-              </div>
-
-              {/* Botão de exportar */}
-              {viewMode === 'list' && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleExportSprite(sprite);
-                  }}
-                  className="p-2 text-gray-400 hover:text-blue-500 transition-colors"
-                  title="Exportar PNG"
-                >
-                  <Download className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          ))}
+              Sprites Editados ({editedSprites.length})
+            </button>
+          )}
         </div>
-      )}
-
-      {/* Painel de detalhes do sprite selecionado */}
-      {selectedSprite && (
-        <div className="bg-gray-50 rounded-lg p-6 border">
-          <div className="flex flex-col lg:flex-row gap-6">
-            {/* Canvas do sprite */}
-            <div className="flex-shrink-0">
-              <div className="flex items-center gap-2 mb-3">
-                <h3 className="text-lg font-semibold text-gray-800">
+      </div>
+      
+      <div className="flex h-96">
+        {/* Galeria de sprites melhorada */}
+        <div className="flex-1">
+          <SpriteGallery
+            sprites={sprites}
+            selectedSprite={selectedSprite}
+            onSpriteSelect={setSelectedSprite}
+            onSpriteEdit={startEditing}
+            onSpriteExport={handleExportSprite}
+            className="h-full border-0 rounded-none"
+          />
+        </div>
+        
+        {/* Painel de detalhes e edição */}
+        {selectedSprite && (
+          <div className="w-80 border-l border-gray-700 flex flex-col">
+            {/* Cabeçalho do sprite */}
+            <div className="p-4 border-b border-gray-700">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-lg font-semibold text-white">
                   Sprite #{selectedSprite.id}
                 </h3>
-                <div className="flex items-center gap-1">
+                {!isEditing ? (
                   <button
-                    onClick={() => setScale(Math.max(1, scale - 1))}
-                    className="p-1 text-gray-500 hover:text-gray-700"
+                    onClick={() => startEditing(selectedSprite)}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm flex items-center space-x-1 transition-colors"
                   >
-                    <ZoomOut className="w-4 h-4" />
+                    <Brush className="w-3 h-3" />
+                    <span>Editar</span>
                   </button>
-                  <span className="text-sm text-gray-600 min-w-[3rem] text-center">
-                    {scale}x
-                  </span>
-                  <button
-                    onClick={() => setScale(Math.min(8, scale + 1))}
-                    className="p-1 text-gray-500 hover:text-gray-700"
-                  >
-                    <ZoomIn className="w-4 h-4" />
-                  </button>
-                </div>
+                ) : (
+                  <div className="flex space-x-1">
+                    <button
+                      onClick={saveEditedSprite}
+                      className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-sm flex items-center space-x-1 transition-colors"
+                    >
+                      <Save className="w-3 h-3" />
+                      <span>Salvar</span>
+                    </button>
+                    <button
+                      onClick={finishEditing}
+                      className="bg-gray-600 hover:bg-gray-700 text-white px-2 py-1 rounded text-sm transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                )}
               </div>
               
-              <div className="bg-white p-4 rounded border inline-block">
-                <canvas
-                  ref={canvasRef}
-                  className="pixelated border"
-                  style={{ imageRendering: 'pixelated' }}
-                />
+              <div className="text-sm text-gray-400 space-y-1">
+                <div>Dimensões: {selectedSprite.width}×{selectedSprite.height}</div>
+                <div>Tamanho: {selectedSprite.width * selectedSprite.height} pixels</div>
+                <div>Paleta: {selectedSprite.paletteIndex}</div>
               </div>
             </div>
-
-            {/* Informações detalhadas */}
-            <div className="flex-1 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Dimensões</label>
-                  <p className="text-lg text-gray-800">{selectedSprite.width}x{selectedSprite.height}px</p>
+            
+            {/* Ferramentas de edição */}
+            {isEditing && showTools && (
+              <div className="p-4 border-b border-gray-700">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-semibold text-white">Ferramentas</h4>
+                  <div className="flex space-x-1">
+                    <button
+                      onClick={handleUndo}
+                      disabled={!editHistory.getHistoryInfo().canUndo}
+                      className="p-1 rounded text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Desfazer"
+                    >
+                      <Undo className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={handleRedo}
+                      disabled={!editHistory.getHistoryInfo().canRedo}
+                      className="p-1 rounded text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Refazer"
+                    >
+                      <Redo className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setShowPalette(!showPalette)}
+                      className={`p-1 rounded transition-colors ${
+                        showPalette ? 'text-blue-400' : 'text-gray-400 hover:text-white'
+                      }`}
+                      title="Paleta de Cores"
+                    >
+                      <Palette className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Tamanho</label>
-                  <p className="text-lg text-gray-800 capitalize">{selectedSprite.attributes?.size || 'medium'}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Área</label>
-                  <p className="text-lg text-gray-800">
-                    {selectedSprite.width * selectedSprite.height} pixels
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Paleta</label>
-                  <p className="text-lg text-gray-800">#{selectedSprite.attributes?.paletteIndex || 0}</p>
-                </div>
+                
+                <DrawingTools
+                  drawingState={drawingState}
+                  className="mb-3"
+                />
+                
+                {showPalette && (
+                  <ColorPalette
+                  selectedColor={drawingState.drawingState.color}
+                  onColorSelect={drawingState.updateColor}
+                  className="mt-3"
+                />
+                )}
               </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-600">Informações</label>
-                <div className="flex gap-2 mt-1">
-                  <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
-                    SAT-based
-                  </span>
-                  <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
-                    {selectedSprite.width}×{selectedSprite.height}
-                  </span>
+            )}
+            
+            {/* Canvas de edição e preview */}
+            <div className="flex-1 p-4 overflow-auto">
+              {isEditing ? (
+                <div className="space-y-4">
+                  {/* Canvas de edição */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-gray-400">Editor:</span>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => setZoom(Math.max(1, zoom - 1))}
+                          className="p-1 rounded text-gray-400 hover:text-white"
+                        >
+                          <ZoomOut className="w-4 h-4" />
+                        </button>
+                        <span className="text-sm text-white font-mono w-8 text-center">{zoom}x</span>
+                        <button
+                          onClick={() => setZoom(Math.min(16, zoom + 1))}
+                          className="p-1 rounded text-gray-400 hover:text-white"
+                        >
+                          <ZoomIn className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-gray-800 rounded-lg p-4 overflow-auto">
+                      <div className="bg-white/10 rounded inline-block p-2">
+                        <canvas
+                          ref={canvasEditor.canvasRef}
+                          onMouseDown={canvasEditor.handleMouseDown}
+                          onMouseMove={canvasEditor.handleMouseMove}
+                          onMouseUp={canvasEditor.handleMouseUp}
+                          onMouseLeave={canvasEditor.handleMouseLeave}
+                          className="border border-gray-600 rounded"
+                          style={{ 
+                            cursor: canvasEditor.getCursor(),
+                            imageRendering: 'pixelated'
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Preview em tempo real */}
+                  <PreviewPanel
+                    imageData={editingSprite}
+                    originalImageData={selectedSprite.imageData}
+                    scale={2}
+                    showComparison={true}
+                    className=""
+                  />
                 </div>
-              </div>
-
-              <div className="flex gap-2">
+              ) : (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-gray-400">Visualização:</span>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => setZoom(Math.max(1, zoom - 1))}
+                        className="p-1 rounded text-gray-400 hover:text-white"
+                      >
+                        <ZoomOut className="w-4 h-4" />
+                      </button>
+                      <span className="text-sm text-white font-mono w-8 text-center">{zoom}x</span>
+                      <button
+                        onClick={() => setZoom(Math.min(16, zoom + 1))}
+                        className="p-1 rounded text-gray-400 hover:text-white"
+                      >
+                        <ZoomIn className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gray-800 rounded-lg p-4 overflow-auto">
+                    <div className="bg-white/10 rounded inline-block p-2">
+                      <canvas
+                        ref={canvasRef}
+                        className="border border-gray-600 rounded"
+                        style={{ imageRendering: 'pixelated' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Botões de exportação */}
+              <div className="mt-4 space-y-2">
                 <button
                   onClick={() => handleExportSprite(selectedSprite)}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg flex items-center justify-center space-x-2 transition-colors"
                 >
-                  <Download className="w-4 h-4" />
-                  Exportar PNG
+                  <FileImage className="w-4 h-4" />
+                  <span>Exportar Sprite</span>
                 </button>
               </div>
             </div>
           </div>
-        </div>
+        )}
+      </div>
+      
+      {/* Diálogo de exportação */}
+      {showExportDialog && (
+        <ExportDialog
+          isOpen={showExportDialog}
+          onClose={() => setShowExportDialog(false)}
+          mode={exportMode}
+          selectedSprite={exportMode === 'single' ? selectedSprite : null}
+          sprites={exportMode === 'sheet' ? sprites : []}
+          romName={data?.metadata.romName}
+        />
+      )}
+      
+      {/* Diálogo de importação */}
+      {showImportDialog && (
+        <ImportDialog
+          isOpen={showImportDialog}
+          onClose={() => setShowImportDialog(false)}
+          onImport={handleImportSprites}
+        />
+      )}
+      
+      {/* Diálogo de projeto */}
+      {showProjectDialog && (
+        <ProjectDialog
+          isOpen={showProjectDialog}
+          onClose={() => setShowProjectDialog(false)}
+          onCreateProject={handleCreateProject}
+        />
       )}
     </div>
   );

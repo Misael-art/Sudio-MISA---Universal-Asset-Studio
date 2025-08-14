@@ -264,45 +264,5 @@ export class MegaDriveTileDecoder {
     return true;
   }
 
-  /**
-   * Cria um tile de teste para desenvolvimento
-   * @param pattern - Padrão do tile ('checkerboard', 'gradient', 'border')
-   * @returns Tile de teste
-   */
-  static createTestTile(pattern: 'checkerboard' | 'gradient' | 'border' = 'checkerboard'): MegaDriveTile {
-    const pixels: number[][] = [];
-    
-    for (let row = 0; row < 8; row++) {
-      const pixelRow: number[] = [];
-      
-      for (let col = 0; col < 8; col++) {
-        let colorIndex = 0;
-        
-        switch (pattern) {
-          case 'checkerboard':
-            colorIndex = (row + col) % 2 === 0 ? 1 : 2;
-            break;
-          case 'gradient':
-            colorIndex = Math.floor((row + col) / 2);
-            break;
-          case 'border':
-            colorIndex = (row === 0 || row === 7 || col === 0 || col === 7) ? 3 : 0;
-            break;
-        }
-        
-        pixelRow.push(colorIndex);
-      }
-      
-      pixels.push(pixelRow);
-    }
-    
-    // Cria dados brutos fictícios
-    const rawData = new Uint8Array(32);
-    
-    return {
-      index: 0,
-      pixels,
-      rawData
-    };
-  }
+  // Método createTestTile removido - sem dados mock/fictícios conforme política do projeto
 }

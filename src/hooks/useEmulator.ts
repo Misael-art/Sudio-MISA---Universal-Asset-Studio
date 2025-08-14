@@ -34,6 +34,7 @@ declare global {
     EJS_core?: string;
     EJS_pathtodata?: string;
     EJS_ready?: () => void;
+    __UAS_METRICS?: Record<string, number>;
   }
 }
 
@@ -50,12 +51,41 @@ export function useEmulator(options: UseEmulatorOptions): UseEmulatorApi {
   const lastEmptySnapshotLogRef = useRef<number>(0);
   const initStartedRef = useRef<boolean>(false);
   const loadStartTimeRef = useRef<number>(0);
+  
+  // Métricas de boot e latência para TESTE_RESULTADOS.md
+  const metricsRef = useRef<{
+    moduleReadyAt?: number;
+    firstFramebufferAt?: number;
+    startEventAt?: number;
+  }>({});
 
   const rel = useCallback((label: string) => {
     const now = performance.now();
     const base = loadStartTimeRef.current || now;
     const delta = Math.round(now - base);
     return `${label} [T+${delta}ms]`;
+  }, []);
+
+  // Função para registrar métricas no window.__UAS_METRICS e logar JSON
+  const recordMetric = useCallback((event: string, timestamp?: number) => {
+    const now = timestamp || performance.now();
+    const base = loadStartTimeRef.current || now;
+    const deltaMs = Math.round(now - base);
+    
+    if (!window.__UAS_METRICS) {
+      window.__UAS_METRICS = {};
+    }
+    window.__UAS_METRICS[event] = deltaMs;
+    
+    // Registrar métricas específicas para cálculo de boot total e latência
+    if (event === 'Module ready') {
+      metricsRef.current.moduleReadyAt = now;
+    } else if (event === 'start') {
+      metricsRef.current.startEventAt = now;
+      // Calcular e logar métricas de boot quando start é disparado
+      const bootMs = deltaMs;
+      console.log(`METRICS_BOOT ${JSON.stringify({ bootMs, firstFramebufferMs: metricsRef.current.firstFramebufferAt ? Math.round(metricsRef.current.firstFramebufferAt - base) : null })}`);
+    }
   }, []);
 
   const coreDescriptor = useMemo(() => getCoreDescriptor(system), [system]);
@@ -68,14 +98,16 @@ export function useEmulator(options: UseEmulatorOptions): UseEmulatorApi {
       console.log('🚀 [INIT] Iniciando configuração do EmulatorJS...');
       if (!containerRef.current.id) containerRef.current.id = 'emulator-mount';
       
-      window.EJS_player = '#' + containerRef.current.id;
+      (window as any).EJS_player = '#' + containerRef.current.id;
       window.EJS_core = coreDescriptor.ejsCore;
       window.EJS_pathtodata = dataPath;
       (window as any).EJS_startOnLoaded = false; // *** CONTROLE MANUAL ***
       (window as any).EJS_threads = 'disabled';
       (window as any).EJS_forceLegacyCores = true;
-      // Evitar ativar modo debug que força carregamento de src/* (ex.: GamepadHandler)
-      try { delete (window as any).EJS_DEBUG_XX; } catch {}
+      // CORREÇÃO CRÍTICA: Forçar carregamento de src/* para incluir EJS_COMPRESSION
+      // O emulator.min.js não contém a classe EJS_COMPRESSION necessária
+      (window as any).EJS_DEBUG_XX = true;
+      console.log('🔧 [INIT] EJS_DEBUG_XX=true para forçar carregamento de compression.js');
 
       console.log('✅ [INIT] Variáveis globais configuradas para controle manual.');
 
@@ -141,14 +173,17 @@ export function useEmulator(options: UseEmulatorOptions): UseEmulatorApi {
       console.log('🔧 [INIT] Anexando listeners de eventos...');
       window.EJS_emulator.on('ready', () => {
         console.log(`🟢 [EVENT] ${rel('ready')}: EmulatorJS pronto (UI carregada).`);
+        recordMetric('ready');
       });
       window.EJS_emulator.on('start', () => {
         console.log(`🎉 [EVENT] ${rel('start')}: Emulador iniciado! ROM carregada e pronta.`);
+        recordMetric('start');
         setIsRunning(true);
         setError(null);
       });
       window.EJS_emulator.on('saveDatabaseLoaded', () => {
         console.log(`🗄️ [EVENT] ${rel('saveDatabaseLoaded')}: Filesystem (IDBFS) montado e pronto.`);
+        recordMetric('saveDatabaseLoaded');
       });
       window.EJS_emulator.on('error', (e: any) => {
         console.error('❌ [EVENT] Erro no EmulatorJS:', e);
@@ -198,6 +233,8 @@ export function useEmulator(options: UseEmulatorOptions): UseEmulatorApi {
       }
       
       console.log('✅ [INIT] Motor do emulador instanciado. Aguardando ROM para inicializar Module...');
+      // Engine pronto para receber ROM
+      setIsReady(true);
 
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro desconhecido';
@@ -256,18 +293,128 @@ export function useEmulator(options: UseEmulatorOptions): UseEmulatorApi {
       // Disparar pipeline padrão: cria UI de loading e inicia download do core
       try {
         console.log(`⚙️ [LOAD] ${rel('createText')}: chamando createText() + downloadGameCore()`);
+        recordMetric('createText');
         window.EJS_emulator.createText();
         // Pode não ser uma Promise em todas as versões; então não depender do await
         const maybePromise = window.EJS_emulator.downloadGameCore?.();
         if (maybePromise && typeof maybePromise.then === 'function') {
           await maybePromise;
           console.log(`✅ [LOAD] ${rel('downloadGameCore')}: downloadGameCore() resolvido`);
+          recordMetric('downloadGameCore');
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Erro desconhecido';
         console.error(`❌ [LOAD] Falha no start do core: ${message}`, err);
         setError(`Falha ao iniciar core: ${message}`);
         return;
+      }
+
+      // CORREÇÃO CRÍTICA: Verificar EJS_COMPRESSION antes de EJS_Runtime
+      console.log(`🔍 [LOAD] ${rel('check EJS_COMPRESSION')}: verificando se EJS_COMPRESSION está disponível...`);
+      {
+        let compressionAttempts = 0;
+        const maxCompressionAttempts = 100; // 10s
+        while (typeof (window as any).EJS_COMPRESSION !== 'function' && compressionAttempts < maxCompressionAttempts) {
+          await new Promise(r => setTimeout(r, 100));
+          compressionAttempts++;
+          if (compressionAttempts % 10 === 0) {
+            console.log(`[LOAD] ${rel('await EJS_COMPRESSION')}: tentando (${compressionAttempts}/${maxCompressionAttempts})`);
+            console.log(`[LOAD] Tipo atual de EJS_COMPRESSION:`, typeof (window as any).EJS_COMPRESSION);
+          }
+        }
+        if (typeof (window as any).EJS_COMPRESSION !== 'function') {
+          console.error('❌ [LOAD] EJS_COMPRESSION não está disponível! Isso causará erro no checkCompression.');
+          console.log('[LOAD] Verificando se compression.js foi carregado...');
+        } else {
+          console.log(`✅ [LOAD] ${rel('EJS_COMPRESSION ready')}: EJS_COMPRESSION detectado.`);
+        }
+      }
+
+      // CORREÇÃO CRÍTICA: Aguardar carregamento do core com logs detalhados
+      console.log(`⏳ [LOAD] ${rel('await EJS_Runtime')}: aguardando window.EJS_Runtime após downloadGameCore...`);
+      console.log(`[LOAD] Estado inicial - EJS_Runtime:`, typeof (window as any).EJS_Runtime);
+      console.log(`[LOAD] Estado inicial - EJS_emulator:`, !!window.EJS_emulator);
+      console.log(`[LOAD] Estado inicial - EmulatorJS:`, typeof window.EmulatorJS);
+      
+      // Escutar evento EJS_Runtime_Ready se disponível
+      let runtimeReadyPromise: Promise<void> | null = null;
+      if (typeof (window as any).EJS_Runtime !== 'function') {
+        console.log(`[LOAD] 📡 Configurando listener para evento EJS_Runtime_Ready...`);
+        runtimeReadyPromise = new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            console.error(`[LOAD] ⏰ Timeout aguardando EJS_Runtime_Ready`);
+            reject(new Error('Timeout aguardando EJS_Runtime'));
+          }, 15000); // 15 segundos
+          
+          const handleRuntimeReady = (event: CustomEvent) => {
+            console.log(`[LOAD] 📡 Evento EJS_Runtime_Ready recebido:`, event.detail);
+            clearTimeout(timeout);
+            window.removeEventListener('EJS_Runtime_Ready', handleRuntimeReady as EventListener);
+            resolve();
+          };
+          
+          window.addEventListener('EJS_Runtime_Ready', handleRuntimeReady as EventListener);
+        });
+      }
+      
+      // Aguardar pelo evento ou polling tradicional
+      if (runtimeReadyPromise) {
+        try {
+          console.log(`[LOAD] ⏳ Aguardando evento EJS_Runtime_Ready...`);
+          await runtimeReadyPromise;
+          console.log(`[LOAD] ✅ EJS_Runtime_Ready recebido!`);
+        } catch (e) {
+          console.warn(`[LOAD] ⚠️ Evento falhou, usando polling tradicional:`, e);
+        }
+      }
+      
+      {
+        let attempts = 0;
+        const maxAttempts = 300; // 30s - aumentado para dar mais tempo
+        while (typeof (window as any).EJS_Runtime !== 'function' && attempts < maxAttempts) {
+          await new Promise(r => setTimeout(r, 100));
+          attempts++;
+          
+          // Log detalhado a cada 10 tentativas (1s)
+          if (attempts % 10 === 0) {
+            console.log(`[LOAD] ${rel('await EJS_Runtime')}: tentativa ${attempts}/${maxAttempts}`);
+            console.log(`[LOAD] - EJS_Runtime:`, typeof (window as any).EJS_Runtime, (window as any).EJS_Runtime);
+            console.log(`[LOAD] - Scripts carregados:`, document.querySelectorAll('script[src*="genesis"]').length);
+            console.log(`[LOAD] - Emulator state:`, window.EJS_emulator?.started, window.EJS_emulator?.Module);
+            
+            // Verificar se há scripts pendentes
+            const pendingScripts = Array.from(document.querySelectorAll('script')).filter(s => 
+              s.src && (s.src.includes('genesis') || s.src.includes('blob:'))
+            );
+            console.log(`[LOAD] - Scripts pendentes:`, pendingScripts.length, pendingScripts.map(s => s.src.substring(0, 50)));
+          }
+          
+          // Log crítico a cada 50 tentativas (5s)
+          if (attempts % 50 === 0) {
+            console.warn(`[LOAD] ⚠️ EJS_Runtime ainda não disponível após ${attempts/10}s`);
+            console.log(`[LOAD] - window keys:`, Object.keys(window).filter(k => k.includes('EJS')));
+            console.log(`[LOAD] - Verificando se downloadGameCore terminou...`);
+          }
+        }
+        
+        if (typeof (window as any).EJS_Runtime !== 'function') {
+          const msg = `EJS_Runtime não está definido após ${attempts/10}s de espera.`;
+          console.error('❌ [LOAD]', msg);
+          console.error('[LOAD] Estado final:');
+          console.error('[LOAD] - EJS_Runtime:', typeof (window as any).EJS_Runtime, (window as any).EJS_Runtime);
+          console.error('[LOAD] - Scripts no DOM:', document.querySelectorAll('script').length);
+          console.error('[LOAD] - Scripts genesis:', document.querySelectorAll('script[src*="genesis"]').length);
+          console.error('[LOAD] - EmulatorJS disponível:', typeof window.EmulatorJS);
+          console.error('[LOAD] - Tentativas realizadas:', attempts);
+          console.error('[LOAD] - Scripts no DOM:', Array.from(document.querySelectorAll('script')).map(s => ({ src: s.src, loaded: s.hasAttribute('data-loaded') })));
+          setError(msg);
+          return;
+        }
+        
+        console.log(`✅ [LOAD] ${rel('EJS_Runtime ready')}: EJS_Runtime detectado após ${attempts/10}s`);
+        console.log(`[LOAD] EJS_Runtime type:`, typeof (window as any).EJS_Runtime);
+        console.log(`[LOAD] EJS_Runtime constructor:`, (window as any).EJS_Runtime?.name);
+        console.log(`[LOAD] - Tentativas necessárias:`, attempts);
       }
 
       // Aguardar Module ficar pronto
@@ -292,6 +439,7 @@ export function useEmulator(options: UseEmulatorOptions): UseEmulatorApi {
             const origCallMain = mod.callMain.bind(mod);
             mod.callMain = (args: any) => {
               console.log(`▶️ [FLOW] ${rel('Module.callMain')}: args=`, args);
+              recordMetric('Module.callMain');
               const r = origCallMain(args);
               console.log(`⏹️ [FLOW] ${rel('Module.callMain')}: retorno=`, r);
               return r;
@@ -300,7 +448,7 @@ export function useEmulator(options: UseEmulatorOptions): UseEmulatorApi {
           }
         } catch {}
         console.log(`✅ [LOAD] ${rel('Module ready')}: Module disponível.`);
-        setIsReady(true);
+        recordMetric('Module ready');
       }
 
       // Caso o fluxo interno não tenha iniciado, forçar downloadFiles (usa config.gameUrl já como blob:)
@@ -393,6 +541,10 @@ export function useEmulator(options: UseEmulatorOptions): UseEmulatorApi {
         if (ptr && gm.Module.HEAPU8 && gm.Module.HEAPF32) {
           framebuffer = new Uint8ClampedArray(gm.Module.HEAPU8.buffer, ptr, width * height * 4);
           memoryViewRef.current = { frame: framebuffer };
+          // Registrar primeiro framebuffer se ainda não foi registrado
+          if (!metricsRef.current.firstFramebufferAt) {
+            metricsRef.current.firstFramebufferAt = performance.now();
+          }
         }
       }
 
@@ -402,10 +554,27 @@ export function useEmulator(options: UseEmulatorOptions): UseEmulatorApi {
           const mount = containerRef.current;
           const canvas = mount?.querySelector('canvas') as HTMLCanvasElement | null;
           if (canvas && canvas.width && canvas.height) {
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-              const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-              framebuffer = new Uint8ClampedArray(img.data); // cópia desacoplada
+            // 1) Tenta 2D direto
+            let imgData: ImageData | null = null;
+            const ctx2d = canvas.getContext('2d');
+            if (ctx2d) {
+              try { imgData = ctx2d.getImageData(0, 0, canvas.width, canvas.height); } catch {}
+            }
+            // 2) Se for WebGL e 2D falhar, desenha em canvas offscreen e lê
+            if (!imgData) {
+              const off = document.createElement('canvas');
+              off.width = canvas.width;
+              off.height = canvas.height;
+              const offctx = off.getContext('2d');
+              if (offctx) {
+                try {
+                  offctx.drawImage(canvas, 0, 0);
+                  imgData = offctx.getImageData(0, 0, off.width, off.height);
+                } catch {}
+              }
+            }
+            if (imgData) {
+              framebuffer = new Uint8ClampedArray(imgData.data);
               width = canvas.width;
               height = canvas.height;
               memoryViewRef.current = { frame: framebuffer };
@@ -433,35 +602,36 @@ export function useEmulator(options: UseEmulatorOptions): UseEmulatorApi {
       let cram = readRegion(coreDescriptor.exports?.cramPtr, coreDescriptor.sizes?.cram);
       let vsram = readRegion(coreDescriptor.exports?.vsramPtr, coreDescriptor.sizes?.vsram);
       let regs = readRegion(coreDescriptor.exports?.regsPtr, coreDescriptor.sizes?.regs);
-      // SAT: preferir ponteiro nativo; fallback para derivado via base típica
-      let sat = readRegion((coreDescriptor.exports as any)?.satPtr, coreDescriptor.sizes?.sat);
-      if (!sat && vram) {
-        const satBase = 0xD800;
-        const satSize = 0x280;
-        if (satBase + satSize <= vram.length) sat = vram.slice(satBase, satBase + satSize);
+      // SAT: apenas via ponteiro nativo; sem derivação por endereço fixo
+      const sat = readRegion((coreDescriptor.exports as any)?.satPtr, coreDescriptor.sizes?.sat);
+
+      // Convert CRAM to palettes if available
+      let palettes: any[] | undefined;
+      if (cram && system === 'megadrive') {
+        try {
+          // Parse CRAM into MegaDrive palettes and convert to expected format
+          const mdPalettes: any[] = [];
+          for (let i = 0; i < 4; i++) {
+            const colors: string[] = [];
+            for (let j = 0; j < 16; j++) {
+              const cramIndex = i * 16 + j;
+              if (cramIndex * 2 + 1 < cram.length) {
+                const word = (cram[cramIndex * 2 + 1] << 8) | cram[cramIndex * 2];
+                const r = ((word >> 1) & 0x07) * 36;
+                const g = ((word >> 5) & 0x07) * 36;
+                const b = ((word >> 9) & 0x07) * 36;
+                colors.push(`#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`);
+              }
+            }
+            mdPalettes.push({ colors });
+          }
+          palettes = mdPalettes.map((p, idx) => ({ id: `PAL${idx}`, colors: p.colors, system: 'megadrive', source: 'CRAM' as const }));
+        } catch {
+          // Ignore palette parsing errors
+        }
       }
 
-      // Fallback por SaveState (uma tentativa) caso não tenhamos regiões essenciais
-      if (!vram && !attemptedFallbackRef.current && typeof gm.getState === 'function') {
-        attemptedFallbackRef.current = true;
-        try {
-          const stateData = gm.getState();
-          if (stateData && (stateData as Uint8Array).byteLength !== undefined) {
-            fallbackExtractFromSaveState(system as SystemId, stateData as Uint8Array)
-              .then(extracted => {
-                if (extracted) {
-                  setSnapshot({ framebuffer, width, height, vram: extracted.vram, cram: extracted.cram, vsram: extracted.vsram, sat: extracted.sat, palettes: undefined, regs: extracted.regs });
-                } else {
-                  setSnapshot({ framebuffer, width, height, vram, cram, vsram, sat, palettes: undefined, regs });
-                }
-              })
-              .catch(() => {
-                setSnapshot({ framebuffer, width, height, vram, cram, vsram, sat, palettes: undefined, regs });
-              });
-            return; // snapshot será setado no then/catch
-          }
-        } catch {}
-      }
+      // Removido fallback por SaveState para cumprir "Sem dados mock/simulados".
       // Evitar spams de snapshot vazio: só publicar quando há framebuffer ou memória útil
       if (framebuffer || vram || cram) {
         setSnapshot({ framebuffer, width, height, vram, cram, vsram, sat, palettes: undefined, regs });

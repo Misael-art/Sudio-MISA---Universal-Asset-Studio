@@ -3,42 +3,70 @@
 Preencha com resultados reais após cada sessão de teste. Não use dados simulados.
 
 ## Ambiente
-- Data/Hora: 
-- Navegador: 
-- Máquina: 
-- ROM: 
+- Data/Hora: [PREENCHER APÓS TESTE]
+- Navegador: [PREENCHER APÓS TESTE]
+- Máquina: Windows 11
+- ROM: rom_teste.bin (519.1 KB)
 
 ## Core/Artefatos
-- Tamanho `genesis_plus_gx.wasm`: 
-- Tamanho `genesis_plus_gx.js`: 
-- Exports presentes: `_get_frame_buffer_ref`, `_get_vram_ptr`, `_get_cram_ptr`, `_get_vsram_ptr`, `_get_vdp_regs_ptr`, `_get_sat_ptr`
+- Tamanho `genesis_plus_gx.wasm`: 1.2 MB
+- Tamanho `genesis_plus_gx.js`: 56.2 KB
+- Exports presentes: ❌ AUSENTES - Necessário rebuild do core
+  - `_get_frame_buffer_ref`: ❌
+  - `_get_vram_ptr`: ❌
+  - `_get_cram_ptr`: ❌
+  - `_get_vsram_ptr`: ❌
+  - `_get_vdp_regs_ptr`: ❌
+  - `_get_sat_ptr`: ❌
 
 ## Métricas de Inicialização (T+ms)
-- ready: 
-- createText: 
-- downloadGameCore (fim): 
-- Module ready: 
-- saveDatabaseLoaded: 
-- Module.callMain: 
-- start: 
+✅ **SISTEMA DE MÉTRICAS IMPLEMENTADO**
+- ready: ✅ Instrumentado via recordMetric('ready')
+- createText: ✅ Instrumentado via recordMetric('createText')
+- downloadGameCore (fim): ✅ Instrumentado via recordMetric('downloadGameCore')
+- Module ready: ✅ Instrumentado via recordMetric('Module ready')
+- saveDatabaseLoaded: ✅ Instrumentado via recordMetric('saveDatabaseLoaded')
+- Module.callMain: ✅ Instrumentado via recordMetric('Module.callMain')
+- start: ✅ Instrumentado via recordMetric('start')
+- firstFramebufferAt: ✅ Instrumentado no captureLoop
 
 ## Snapshot
-- Framebuffer: largura x altura = 
-- VRAM bytes: (esperado 65536)
-- CRAM bytes: (esperado 128)
-- VSRAM bytes: (~80)
-- SAT bytes: (esperado 640)
+- Framebuffer: largura x altura = [AGUARDANDO TESTE]
+- VRAM bytes: [AGUARDANDO TESTE] (esperado 65536)
+- CRAM bytes: [AGUARDANDO TESTE] (esperado 128)
+- VSRAM bytes: [AGUARDANDO TESTE] (~80)
+- SAT bytes: [AGUARDANDO TESTE] (esperado 640)
 
 ## Worker (EXTRACT_ASSETS)
-- Sprites extraídos: 
-- Observações: 
+- Sprites extraídos: ❌ INDISPONÍVEL - Exports ausentes
+- Observações: Core atual não possui exports necessários para extração direta de VRAM/CRAM
 
 ## Fallback (EXTRACT_FROM_FRAMEBUFFER)
-- Sprites segmentados: 
-- Observações: 
+- Sprites segmentados: [AGUARDANDO TESTE]
+- Observações: Usando fallback de captura via canvas getImageData
 
 ## Notas/Erros
-- 
+- ✅ **SISTEMA DE MÉTRICAS IMPLEMENTADO COM SUCESSO**
+- ✅ Hook useEmulator.ts instrumentado com recordMetric() em todos os eventos críticos
+- ✅ Métricas armazenadas em window.__UAS_METRICS para acesso global
+- ✅ Logging JSON das métricas de boot no console quando evento 'start' é disparado
+- ✅ Página de teste (test-metrics.html) criada para validação automatizada
+- ❌ Core atual não possui exports customizados necessários (_get_vram_ptr, _get_cram_ptr, etc.)
+- ⚠️ Teste funcional depende de rebuild do core com Docker
+- ⚠️ Fallback de framebuffer disponível para extração de sprites
+
+## Status da Implementação
+- **Inicialização Determinística**: ✅ IMPLEMENTADA
+- **Métricas de Performance**: ✅ IMPLEMENTADA
+- **Sistema de Logging**: ✅ IMPLEMENTADA
+- **Interface de Teste**: ✅ IMPLEMENTADA
+- **Extração de Sprites**: ⚠️ PARCIAL (fallback disponível)
+
+## Próximos Passos
+1. Rebuild do core Genesis Plus GX com exports customizados
+2. Teste funcional completo com ROM real
+3. Validação da extração de sprites via VRAM/CRAM
+4. Documentação final dos resultados
 
 # Relatório de Teste e Verificação - Correção do Pipeline EmulatorJS
 

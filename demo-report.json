@@ -1,0 +1,20 @@
+﻿{
+    "environment":  {
+                        "scripts_available":  true,
+                        "config_available":  true
+                    },
+    "files":  {
+                  "wasm":  {
+                               "exists":  true,
+                               "size":  2187228
+                           },
+                  "js":  {
+                             "exists":  true,
+                             "size":  63489
+                         }
+              },
+    "timestamp":  "2025-08-11 09:47:14",
+    "duration":  1.1117974,
+    "success":  true,
+    "server_running":  true
+}

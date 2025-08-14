@@ -206,8 +206,7 @@ function MainInterface() {
           
           // Se há payload, processar dados extraídos
           if (response.payload) {
-            const isMock = response.isMock === true ? ' (SIMULADO)' : ' (REAL)';
-            addLogEntry('info', `Dados extraídos do worker recebidos${isMock}`);
+            addLogEntry('info', 'Dados extraídos do worker recebidos');
             addLogEntry('info', `Payload contém: vram=${response.payload.vram?.length || 0} bytes, cram=${response.payload.cram?.length || 0} bytes, vsram=${response.payload.vsram?.length || 0} bytes`);
             processWorkerPayload(response.payload);
           } else {

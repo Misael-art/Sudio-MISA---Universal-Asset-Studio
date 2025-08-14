@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Pipeline de Renderização - Framebuffer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #1a1a1a;
+            color: #ffffff;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .test-section {
+            background-color: #2a2a2a;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border-left: 4px solid #4CAF50;
+        }
+        .error {
+            border-left-color: #f44336;
+        }
+        .warning {
+            border-left-color: #ff9800;
+        }
+        .log {
+            background-color: #000;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .status {
+            font-weight: bold;
+            padding: 5px 10px;
+            border-radius: 4px;
+            display: inline-block;
+            margin: 5px 0;
+        }
+        .status.success { background-color: #4CAF50; }
+        .status.error { background-color: #f44336; }
+        .status.warning { background-color: #ff9800; }
+        .status.info { background-color: #2196F3; }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #666;
+            cursor: not-allowed;
+        }
+        .framebuffer-display {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .framebuffer-canvas {
+            border: 2px solid #555;
+            border-radius: 4px;
+        }
+        .framebuffer-info {
+            background-color: #333;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .metric-card {
+            background-color: #333;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #ccc;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🖼️ Teste de Pipeline de Renderização - Fase 0</h1>
+        
+        <div class="test-section">
+            <h2>📋 Status do Teste</h2>
+            <div id="status">Aguardando início do teste...</div>
+            <button onclick="startFramebufferTest()">Iniciar Teste de Framebuffer</button>
+            <button onclick="clearLog()">Limpar Log</button>
+        </div>
+
+        <div class="test-section">
+            <h2>📊 Métricas do Pipeline</h2>
+            <div class="metrics" id="metrics">
+                <div class="metric-card">
+                    <div class="metric-value" id="frames-captured">0</div>
+                    <div class="metric-label">Frames Capturados</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="framebuffer-size">0</div>
+                    <div class="metric-label">Tamanho do Framebuffer</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="fps">0</div>
+                    <div class="metric-label">FPS Médio</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="data-integrity">0%</div>
+                    <div class="metric-label">Integridade dos Dados</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🖼️ Visualização do Framebuffer</h2>
+            <div id="framebuffer-display" class="framebuffer-display">
+                <div>
+                    <h3>Framebuffer Atual</h3>
+                    <canvas id="framebuffer-canvas" class="framebuffer-canvas" width="320" height="240"></canvas>
+                    <div id="framebuffer-info" class="framebuffer-info">Aguardando dados...</div>
+                </div>
+                <div>
+                    <h3>Análise de Pixels</h3>
+                    <canvas id="analysis-canvas" class="framebuffer-canvas" width="320" height="240"></canvas>
+                    <div id="analysis-info" class="framebuffer-info">Aguardando análise...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🔍 Validação da Integridade</h2>
+            <div id="integrity-results">Aguardando captura de framebuffer...</div>
+        </div>
+
+        <div class="test-section">
+            <h2>📝 Log Detalhado</h2>
+            <div id="log" class="log">Aguardando início dos testes...
+</div>
+        </div>
+
+        <!-- Container oculto para o emulador -->
+        <div id="emulator-container" style="display: none; width: 320px; height: 240px;"></div>
+    </div>
+
+    <script>
+        let logElement;
+        let statusElement;
+        let gameManager = null;
+        let captureInterval = null;
+        let framesCaptured = 0;
+        let startTime = 0;
+        let lastFrameData = null;
+        let integrityScore = 0;
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = {
+                'info': '📝',
+                'success': '✅',
+                'error': '❌',
+                'warning': '⚠️'
+            }[type] || '📝';
+            
+            logElement.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function updateStatus(message, type = 'info') {
+            statusElement.innerHTML = `<span class="status ${type}">${message}</span>`;
+        }
+
+        function clearLog() {
+            logElement.textContent = 'Log limpo.\n';
+        }
+
+        function updateMetrics() {
+            document.getElementById('frames-captured').textContent = framesCaptured;
+            
+            if (lastFrameData) {
+                document.getElementById('framebuffer-size').textContent = 
+                    `${lastFrameData.width}x${lastFrameData.height}`;
+            }
+            
+            if (startTime > 0) {
+                const elapsed = (Date.now() - startTime) / 1000;
+                const fps = framesCaptured / elapsed;
+                document.getElementById('fps').textContent = fps.toFixed(1);
+            }
+            
+            document.getElementById('data-integrity').textContent = `${integrityScore.toFixed(1)}%`;
+        }
+
+        async function startFramebufferTest() {
+            logElement = document.getElementById('log');
+            statusElement = document.getElementById('status');
+
+            updateStatus('Iniciando teste de pipeline de renderização...', 'info');
+            log('🚀 Iniciando teste de pipeline de renderização e framebuffer');
+            
+            try {
+                // 1. Carregar EmulatorJS
+                log('📦 Carregando EmulatorJS...');
+                await loadEmulatorJS();
+                
+                // 2. Configurar emulador
+                log('⚙️ Configurando emulador...');
+                await setupEmulator();
+                
+                // 3. Aguardar inicialização
+                log('⏳ Aguardando inicialização...');
+                await waitForEmulatorReady();
+                
+                // 4. Iniciar captura de framebuffer
+                log('🎬 Iniciando captura de framebuffer...');
+                startFramebufferCapture();
+                
+                updateStatus('Teste de framebuffer em execução', 'success');
+                
+            } catch (error) {
+                log(`❌ Erro durante o teste: ${error.message}`, 'error');
+                updateStatus('Erro no teste de framebuffer', 'error');
+            }
+        }
+
+        async function loadEmulatorJS() {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = '/emulatorjs-data/loader.js';
+                script.onload = () => {
+                    log('✅ EmulatorJS loader carregado');
+                    resolve();
+                };
+                script.onerror = () => {
+                    reject(new Error('Falha ao carregar EmulatorJS loader'));
+                };
+                document.head.appendChild(script);
+            });
+        }
+
+        async function setupEmulator() {
+            // Configurar EmulatorJS
+            window.EJS_player = '#emulator-container';
+            window.EJS_core = 'genplusgx';
+            window.EJS_gameUrl = '/data/rom_teste.bin';
+            window.EJS_pathtodata = '/emulatorjs-data/';
+            
+            log('🎮 Emulador configurado para Genesis Plus GX');
+        }
+
+        async function waitForEmulatorReady() {
+            return new Promise((resolve, reject) => {
+                let attempts = 0;
+                const maxAttempts = 30;
+                
+                const checkReady = () => {
+                    attempts++;
+                    
+                    if (window.EJS_emulator && window.EJS_emulator.gameManager) {
+                        gameManager = window.EJS_emulator.gameManager;
+                        log('✅ Emulador inicializado e pronto');
+                        resolve();
+                        return;
+                    }
+                    
+                    if (attempts >= maxAttempts) {
+                        reject(new Error('Timeout aguardando inicialização do emulador'));
+                        return;
+                    }
+                    
+                    log(`⏳ Aguardando emulador... (${attempts}/${maxAttempts})`);
+                    setTimeout(checkReady, 1000);
+                };
+                
+                checkReady();
+            });
+        }
+
+        function startFramebufferCapture() {
+            startTime = Date.now();
+            framesCaptured = 0;
+            
+            captureInterval = setInterval(() => {
+                captureFramebuffer();
+            }, 100); // Capturar a cada 100ms
+            
+            log('🎬 Captura de framebuffer iniciada (10 FPS)');
+        }
+
+        function captureFramebuffer() {
+            if (!gameManager || !gameManager.Module) {
+                return;
+            }
+            
+            try {
+                const module = gameManager.Module;
+                let framebuffer = null;
+                let width = 320;
+                let height = 240;
+                
+                // Tentar capturar via ponteiro direto
+                const getFrameRef = tryGetExport(['_get_frame_buffer_ref', 'get_frame_buffer_ref']);
+                
+                if (getFrameRef && typeof getFrameRef === 'function') {
+                    const ptr = getFrameRef();
+                    if (ptr && module.HEAPU8) {
+                        framebuffer = new Uint8ClampedArray(module.HEAPU8.buffer, ptr, width * height * 4);
+                        log(`📸 Framebuffer capturado via ponteiro: 0x${ptr.toString(16)}`, 'success');
+                    }
+                }
+                
+                // Fallback: capturar do canvas
+                if (!framebuffer) {
+                    const canvas = document.querySelector('#emulator-container canvas');
+                    if (canvas) {
+                        const ctx = canvas.getContext('2d');
+                        if (ctx) {
+                            try {
+                                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                                framebuffer = new Uint8ClampedArray(imageData.data);
+                                width = canvas.width;
+                                height = canvas.height;
+                                log('📸 Framebuffer capturado via canvas', 'success');
+                            } catch (e) {
+                                log(`⚠️ Erro ao capturar do canvas: ${e.message}`, 'warning');
+                            }
+                        }
+                    }
+                }
+                
+                if (framebuffer) {
+                    framesCaptured++;
+                    lastFrameData = { framebuffer, width, height };
+                    
+                    // Atualizar visualização
+                    updateFramebufferDisplay(framebuffer, width, height);
+                    
+                    // Analisar integridade
+                    analyzeFramebufferIntegrity(framebuffer, width, height);
+                    
+                    // Atualizar métricas
+                    updateMetrics();
+                    
+                    if (framesCaptured % 10 === 0) {
+                        log(`📊 ${framesCaptured} frames capturados`);
+                    }
+                } else {
+                    if (framesCaptured === 0) {
+                        log('⚠️ Nenhum framebuffer disponível ainda', 'warning');
+                    }
+                }
+                
+            } catch (error) {
+                log(`❌ Erro na captura: ${error.message}`, 'error');
+            }
+        }
+
+        function tryGetExport(names) {
+            if (!gameManager || !gameManager.Module) return null;
+            
+            const module = gameManager.Module;
+            
+            for (const name of names) {
+                // Tentar acesso direto
+                if (typeof module[name] === 'function') {
+                    return module[name];
+                }
+                
+                // Tentar via cwrap
+                if (module.cwrap) {
+                    try {
+                        const wrapped = module.cwrap(name, 'number', []);
+                        if (typeof wrapped === 'function') {
+                            return wrapped;
+                        }
+                    } catch (e) {
+                        // Ignore
+                    }
+                }
+            }
+            
+            return null;
+        }
+
+        function updateFramebufferDisplay(framebuffer, width, height) {
+            const canvas = document.getElementById('framebuffer-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            const imageData = new ImageData(framebuffer, width, height);
+            ctx.putImageData(imageData, 0, 0);
+            
+            // Atualizar informações
+            const info = document.getElementById('framebuffer-info');
+            info.innerHTML = `
+                Resolução: ${width}x${height}<br>
+                Tamanho: ${framebuffer.length} bytes<br>
+                Formato: RGBA32<br>
+                Frame: ${framesCaptured}
+            `;
+        }
+
+        function analyzeFramebufferIntegrity(framebuffer, width, height) {
+            // Análise de integridade dos dados
+            let nonZeroPixels = 0;
+            let uniqueColors = new Set();
+            let totalPixels = width * height;
+            
+            for (let i = 0; i < framebuffer.length; i += 4) {
+                const r = framebuffer[i];
+                const g = framebuffer[i + 1];
+                const b = framebuffer[i + 2];
+                const a = framebuffer[i + 3];
+                
+                if (r !== 0 || g !== 0 || b !== 0) {
+                    nonZeroPixels++;
+                }
+                
+                const color = (r << 24) | (g << 16) | (b << 8) | a;
+                uniqueColors.add(color);
+            }
+            
+            const dataPercentage = (nonZeroPixels / totalPixels) * 100;
+            integrityScore = dataPercentage;
+            
+            // Atualizar canvas de análise
+            const analysisCanvas = document.getElementById('analysis-canvas');
+            const analysisCtx = analysisCanvas.getContext('2d');
+            analysisCanvas.width = width;
+            analysisCanvas.height = height;
+            
+            // Criar visualização de análise (destacar pixels não-zero)
+            const analysisData = new Uint8ClampedArray(framebuffer.length);
+            for (let i = 0; i < framebuffer.length; i += 4) {
+                const r = framebuffer[i];
+                const g = framebuffer[i + 1];
+                const b = framebuffer[i + 2];
+                
+                if (r !== 0 || g !== 0 || b !== 0) {
+                    // Pixel com dados - destacar em verde
+                    analysisData[i] = 0;
+                    analysisData[i + 1] = 255;
+                    analysisData[i + 2] = 0;
+                    analysisData[i + 3] = 255;
+                } else {
+                    // Pixel vazio - mostrar em vermelho escuro
+                    analysisData[i] = 64;
+                    analysisData[i + 1] = 0;
+                    analysisData[i + 2] = 0;
+                    analysisData[i + 3] = 255;
+                }
+            }
+            
+            const analysisImageData = new ImageData(analysisData, width, height);
+            analysisCtx.putImageData(analysisImageData, 0, 0);
+            
+            // Atualizar informações de análise
+            const analysisInfo = document.getElementById('analysis-info');
+            analysisInfo.innerHTML = `
+                Pixels não-zero: ${nonZeroPixels}/${totalPixels}<br>
+                Integridade: ${dataPercentage.toFixed(1)}%<br>
+                Cores únicas: ${uniqueColors.size}<br>
+                Status: ${dataPercentage > 10 ? '✅ Bom' : '⚠️ Baixo'}
+            `;
+            
+            // Atualizar resultados de validação
+            updateIntegrityResults(dataPercentage, uniqueColors.size, nonZeroPixels, totalPixels);
+        }
+
+        function updateIntegrityResults(dataPercentage, uniqueColors, nonZeroPixels, totalPixels) {
+            const resultsDiv = document.getElementById('integrity-results');
+            
+            let results = '<h3>Resultados da Validação:</h3>';
+            
+            // Critérios de validação
+            const hasData = dataPercentage > 5;
+            const hasVariety = uniqueColors > 10;
+            const hasReasonableSize = totalPixels >= 76800; // 320x240
+            
+            if (hasData) {
+                results += '<div style="color: #4CAF50;">✅ Framebuffer contém dados visuais significativos</div>';
+            } else {
+                results += '<div style="color: #f44336;">❌ Framebuffer majoritariamente vazio</div>';
+            }
+            
+            if (hasVariety) {
+                results += '<div style="color: #4CAF50;">✅ Boa variedade de cores detectada</div>';
+            } else {
+                results += '<div style="color: #ff9800;">⚠️ Pouca variedade de cores</div>';
+            }
+            
+            if (hasReasonableSize) {
+                results += '<div style="color: #4CAF50;">✅ Resolução adequada para Mega Drive</div>';
+            } else {
+                results += '<div style="color: #ff9800;">⚠️ Resolução inesperada</div>';
+            }
+            
+            if (framesCaptured > 10) {
+                results += '<div style="color: #4CAF50;">✅ Pipeline de captura funcionando consistentemente</div>';
+            }
+            
+            // Resumo final
+            const score = (hasData ? 40 : 0) + (hasVariety ? 30 : 0) + (hasReasonableSize ? 20 : 0) + (framesCaptured > 10 ? 10 : 0);
+            
+            if (score >= 80) {
+                results += '<div style="color: #4CAF50; font-weight: bold; margin-top: 15px;">🎉 PIPELINE APROVADO: Renderização funcionando corretamente!</div>';
+            } else if (score >= 60) {
+                results += '<div style="color: #ff9800; font-weight: bold; margin-top: 15px;">⚠️ PIPELINE PARCIAL: Funcionando com limitações</div>';
+            } else {
+                results += '<div style="color: #f44336; font-weight: bold; margin-top: 15px;">❌ PIPELINE REPROVADO: Problemas críticos detectados</div>';
+            }
+            
+            resultsDiv.innerHTML = results;
+        }
+    </script>
+</body>
+</html>

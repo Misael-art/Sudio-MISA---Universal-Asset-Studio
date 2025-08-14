@@ -4,10 +4,107 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Universal Asset Studio</title>
+    <title>Universal Asset Studio - Genesis Plus GX Core Tester</title>
+    <meta name="description" content="Universal Asset Studio - Fase 1: Validação do core Genesis Plus GX e captura de memória" />
   </head>
   <body>
     <div id="root"></div>
+    
+    <!-- Implementando Fase 1: Carregamento local do Genesis Plus GX -->
+    <!-- Seguindo o princípio de "Confiança Zero" - sem dependências de CDN -->
+    <script>
+      // Configuração global para o módulo Emscripten
+      // Preparação para carregamento do core Genesis Plus GX
+      window.Module = {
+        locateFile: function(path) {
+          console.log('[MODULE] locateFile chamado para:', path);
+          // CORREÇÃO CRÍTICA: Garante que o arquivo .wasm seja carregado do diretório correto
+          if (path.endsWith('.wasm') || path === 'genesis_plus_gx.wasm' || path === 'genplusgx.wasm') {
+            // Usar o arquivo WASM correto
+            const wasmPath = '/emulatorjs-data/cores/genesis_plus_gx.wasm';
+            console.log('[MODULE] ✅ Redirecionando WASM para:', wasmPath);
+            return wasmPath;
+          }
+          console.log('[MODULE] Mantendo caminho original:', path);
+          return path;
+        },
+        onRuntimeInitialized: function() {
+          console.log('[MODULE] ✅ Genesis Plus GX runtime inicializado via index.html');
+        },
+        onAbort: function(what) {
+          console.error('[MODULE] ❌ Genesis Plus GX abortou:', what);
+        },
+        print: function(text) {
+          console.log('[MODULE] Genesis Plus GX:', text);
+        },
+        printErr: function(text) {
+          console.error('[MODULE] Genesis Plus GX Error:', text);
+        },
+        // CORREÇÃO ADICIONAL: Configurações para evitar problemas de import
+        wasmBinary: null, // Força carregamento via locateFile
+        instantiateWasm: undefined, // Usa o método padrão
+        noInitialRun: false,
+        noExitRuntime: true
+      };
+    </script>
+    
+    <!-- As classes storage e gamepad são carregadas automaticamente pelo loader.js -->
+    
+    <!-- CORREÇÃO CRÍTICA: Carregamento IMEDIATO do core Genesis Plus GX -->
+    <!-- Garante que EJS_Runtime esteja disponível ANTES de qualquer tentativa do EmulatorJS -->
+    <script src="/emulatorjs-data/cores/genesis_plus_gx.js"></script>
+    
+    <!-- FALLBACK: Carregar também o genplusgx.js como alternativa -->
+    <script>
+      // Definir EJS_Runtime a partir do Module se não estiver definido
+      if (typeof window.EJS_Runtime !== 'function' && typeof window.Module === 'function') {
+        console.log('[PRELOAD] 🔄 Definindo EJS_Runtime a partir de Module');
+        window.EJS_Runtime = window.Module;
+      }
+    </script>
+    <script src="/emulatorjs-data/cores/genplusgx.js"></script>
+    
+    <!-- Verificação adicional para garantir que EJS_Runtime foi definido -->
+    <script>
+      console.log('[PRELOAD] ✅ genesis_plus_gx.js carregado imediatamente');
+      console.log('[PRELOAD] - EJS_Runtime disponível:', typeof window.EJS_Runtime);
+      console.log('[PRELOAD] - Module configurado:', typeof window.Module);
+      
+      // Verificação de compatibilidade WASM
+      if (typeof WebAssembly === 'object') {
+        console.log('[PRELOAD] ✅ WebAssembly suportado');
+      } else {
+        console.error('[PRELOAD] ❌ WebAssembly não suportado!');
+      }
+      
+      // Fallback adicional caso o carregamento direto falhe
+      if (typeof window.EJS_Runtime !== 'function') {
+        console.warn('[PRELOAD] ⚠️ EJS_Runtime não definido após carregamento direto. Tentando fallback...');
+        
+        // Tentar carregar dinamicamente como backup
+        const script = document.createElement('script');
+        script.src = '/emulatorjs-data/cores/genesis_plus_gx.js';
+        script.onload = () => {
+          console.log('[PRELOAD] ✅ Fallback bem-sucedido - EJS_Runtime:', typeof window.EJS_Runtime);
+        };
+        script.onerror = (e) => {
+          console.error('[PRELOAD] ❌ Fallback falhou:', e);
+        };
+        document.head.appendChild(script);
+      }
+      
+      // Interceptar erros de WebAssembly para debug
+      const originalInstantiate = WebAssembly.instantiate;
+      WebAssembly.instantiate = function(...args) {
+        console.log('[WASM] Tentativa de instanciação:', args[0] instanceof ArrayBuffer ? 'ArrayBuffer' : typeof args[0], args[1] ? 'com imports' : 'sem imports');
+        return originalInstantiate.apply(this, args).catch(error => {
+          console.error('[WASM] ❌ Erro na instanciação:', error);
+          throw error;
+        });
+      };
+    </script>
+    
+    <!-- Carregamento do script principal do Vite -->
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

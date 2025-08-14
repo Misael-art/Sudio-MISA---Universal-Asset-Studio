@@ -9,33 +9,13 @@ export interface ExtractedMemory {
   regs?: Uint8Array;
 }
 
-export async function fallbackExtractFromSaveState(system: SystemId, state: Uint8Array): Promise<ExtractedMemory | null> {
-  try {
-    // Estrutura extensível: despacha por sistema.
-    switch (system) {
-      case 'megadrive':
-      case 'genesis':
-      case 'segaMD':
-        return extractMegaDrive(state);
-      case 'snes':
-      case 'sfc':
-        return extractSNES(state);
-      default:
-        return null;
-    }
-  } catch {
-    return null;
-  }
+// Removido o fallback de extração por SaveState para cumprir a regra "Sem dados mock/simulados".
+export async function fallbackExtractFromSaveState(_system: SystemId, _state: Uint8Array): Promise<ExtractedMemory | null> {
+  throw new Error('Extração por SaveState está desativada. Use apenas ponteiros reais do core (VRAM/CRAM/VSRAM/SAT).');
 }
 
-async function extractMegaDrive(_state: Uint8Array): Promise<ExtractedMemory | null> {
-  // TODO: Implementar parsing de SaveState do core atual.
-  // Sem especificação formal do formato, retornar null de forma segura.
-  return null;
-}
+// Rotas de extração via SaveState foram desativadas para evitar ambiguidade de dados.
+async function extractMegaDrive(_state: Uint8Array): Promise<ExtractedMemory | null> { return null; }
 
-async function extractSNES(_state: Uint8Array): Promise<ExtractedMemory | null> {
-  // TODO: Implementar parsing de SaveState do core SNES.
-  return null;
-}
+async function extractSNES(_state: Uint8Array): Promise<ExtractedMemory | null> { return null; }
 

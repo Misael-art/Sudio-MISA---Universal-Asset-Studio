@@ -63,7 +63,8 @@ self.onmessage = async (event: MessageEvent<WorkerEnvelope<ExtractAssetsPayload 
           postError('Payload ausente em EXTRACT_ASSETS');
           return;
         }
-        const { system, vram, cram, vsram, sat } = payload;
+        const extractPayload = payload as ExtractAssetsPayload;
+        const { system, vram, cram, vsram, sat } = extractPayload;
         if (system !== 'megadrive') {
           postError(`Sistema não suportado no worker: ${system}`);
           return;
@@ -78,8 +79,11 @@ self.onmessage = async (event: MessageEvent<WorkerEnvelope<ExtractAssetsPayload 
         const palettes = MegaDrivePaletteDecoder.decode(cram);
         // 2) Tiles
         const tiles = MegaDriveTileDecoder.decode(vram);
-        // 3) SAT: usar SAT se fornecida; caso contrário, aceitar VSRAM (modo compatibilidade)
-        const spriteTable = sat ?? vsram ?? new Uint8Array(0);
+        // 3) Tabela de sprites: exigir SAT real; VSRAM não é substituto de SAT
+        if (!sat) {
+          throw new Error('SAT ausente: o core deve exportar ponteiro válido para a Sprite Attribute Table (_get_sat_ptr).');
+        }
+        const spriteTable = sat;
         // 4) Sprites
         const sprites = MegaDriveSpriteDecoder.decode(spriteTable, vram, palettes);
 

@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Exportações do Core Genesis Plus GX</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #1a1a1a;
+            color: #ffffff;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .test-section {
+            background-color: #2a2a2a;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border-left: 4px solid #4CAF50;
+        }
+        .error {
+            border-left-color: #f44336;
+        }
+        .warning {
+            border-left-color: #ff9800;
+        }
+        .log {
+            background-color: #000;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .status {
+            font-weight: bold;
+            padding: 5px 10px;
+            border-radius: 4px;
+            display: inline-block;
+            margin: 5px 0;
+        }
+        .status.success { background-color: #4CAF50; }
+        .status.error { background-color: #f44336; }
+        .status.warning { background-color: #ff9800; }
+        .status.info { background-color: #2196F3; }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #666;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Diagnóstico do Core Genesis Plus GX - Fase 0</h1>
+        
+        <div class="test-section">
+            <h2>📋 Status do Teste</h2>
+            <div id="status">Aguardando início do teste...</div>
+            <button onclick="startTest()">Iniciar Teste de Exportações</button>
+            <button onclick="clearLog()">Limpar Log</button>
+        </div>
+
+        <div class="test-section">
+            <h2>📊 Resultados das Exportações</h2>
+            <div id="exports-results">Nenhum teste executado ainda.</div>
+        </div>
+
+        <div class="test-section">
+            <h2>🧠 Teste de Ponteiros de Memória</h2>
+            <div id="memory-results">Aguardando carregamento de ROM...</div>
+            <input type="file" id="romFile" accept=".bin,.md,.gen,.smd" style="margin: 10px 0;">
+            <button onclick="testMemoryPointers()" id="testMemoryBtn" disabled>Testar Ponteiros de Memória</button>
+        </div>
+
+        <div class="test-section">
+            <h2>📝 Log Detalhado</h2>
+            <div id="log" class="log">Aguardando início dos testes...
+</div>
+        </div>
+    </div>
+
+    <script>
+        let logElement;
+        let statusElement;
+        let exportsElement;
+        let memoryElement;
+        let emulatorModule = null;
+        let romLoaded = false;
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = {
+                'info': '📝',
+                'success': '✅',
+                'error': '❌',
+                'warning': '⚠️'
+            }[type] || '📝';
+            
+            logElement.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function updateStatus(message, type = 'info') {
+            statusElement.innerHTML = `<span class="status ${type}">${message}</span>`;
+        }
+
+        function clearLog() {
+            logElement.textContent = 'Log limpo.\n';
+        }
+
+        async function startTest() {
+            logElement = document.getElementById('log');
+            statusElement = document.getElementById('status');
+            exportsElement = document.getElementById('exports-results');
+            memoryElement = document.getElementById('memory-results');
+
+            updateStatus('Iniciando teste de exportações...', 'info');
+            log('🚀 Iniciando diagnóstico do Core Genesis Plus GX');
+            
+            try {
+                // Carregar o core
+                log('📦 Carregando core Genesis Plus GX...');
+                await loadCore();
+                
+                // Testar exportações
+                log('🔍 Verificando exportações obrigatórias...');
+                testExports();
+                
+                updateStatus('Teste de exportações concluído', 'success');
+                
+            } catch (error) {
+                log(`Erro durante o teste: ${error.message}`, 'error');
+                updateStatus('Erro no teste de exportações', 'error');
+            }
+        }
+
+        async function loadCore() {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = '/emulatorjs-data/cores/genplusgx.js';
+                script.onload = () => {
+                    log('✅ Script do core carregado');
+                    
+                    // Aguardar o Module estar disponível
+                    const checkModule = () => {
+                        if (typeof Module !== 'undefined') {
+                            emulatorModule = Module;
+                            log('✅ Module do emulador disponível');
+                            resolve();
+                        } else {
+                            setTimeout(checkModule, 100);
+                        }
+                    };
+                    checkModule();
+                };
+                script.onerror = () => {
+                    reject(new Error('Falha ao carregar script do core'));
+                };
+                document.head.appendChild(script);
+            });
+        }
+
+        function testExports() {
+            const requiredExports = [
+                '_get_frame_buffer_ref',
+                '_get_vram_ptr',
+                '_get_cram_ptr',
+                '_get_vsram_ptr',
+                '_get_vdp_regs_ptr',
+                '_get_sat_ptr'
+            ];
+
+            const alternativeExports = [
+                'get_frame_buffer_ref',
+                'get_vram_ptr',
+                'get_cram_ptr',
+                'get_vsram_ptr',
+                'get_vdp_regs_ptr',
+                'get_sat_ptr'
+            ];
+
+            let results = '<h3>Exportações Encontradas:</h3>';
+            let foundCount = 0;
+            let totalCount = requiredExports.length;
+
+            for (let i = 0; i < requiredExports.length; i++) {
+                const exportName = requiredExports[i];
+                const altName = alternativeExports[i];
+                
+                let found = false;
+                let foundAs = '';
+                
+                if (emulatorModule && typeof emulatorModule[exportName] === 'function') {
+                    found = true;
+                    foundAs = exportName;
+                    foundCount++;
+                } else if (emulatorModule && typeof emulatorModule[altName] === 'function') {
+                    found = true;
+                    foundAs = altName;
+                    foundCount++;
+                } else if (emulatorModule && emulatorModule.cwrap) {
+                    // Tentar via cwrap
+                    try {
+                        const wrapped = emulatorModule.cwrap(exportName, 'number', []);
+                        if (wrapped) {
+                            found = true;
+                            foundAs = `${exportName} (via cwrap)`;
+                            foundCount++;
+                        }
+                    } catch (e) {
+                        try {
+                            const wrapped = emulatorModule.cwrap(altName, 'number', []);
+                            if (wrapped) {
+                                found = true;
+                                foundAs = `${altName} (via cwrap)`;
+                                foundCount++;
+                            }
+                        } catch (e2) {
+                            // Ignore
+                        }
+                    }
+                }
+                
+                if (found) {
+                    results += `<div style="color: #4CAF50;">✅ ${foundAs}</div>`;
+                    log(`✅ Exportação encontrada: ${foundAs}`, 'success');
+                } else {
+                    results += `<div style="color: #f44336;">❌ ${exportName} / ${altName}</div>`;
+                    log(`❌ Exportação ausente: ${exportName} / ${altName}`, 'error');
+                }
+            }
+
+            results += `<h3>Resumo:</h3>`;
+            results += `<div>Encontradas: ${foundCount}/${totalCount}</div>`;
+            
+            if (foundCount === totalCount) {
+                results += `<div style="color: #4CAF50; font-weight: bold;">🎉 Todas as exportações obrigatórias estão presentes!</div>`;
+                log('🎉 Todas as exportações obrigatórias encontradas!', 'success');
+            } else {
+                results += `<div style="color: #f44336; font-weight: bold;">⚠️ ${totalCount - foundCount} exportações ausentes - BLOQUEADOR CRÍTICO</div>`;
+                log(`⚠️ ${totalCount - foundCount} exportações ausentes - BLOQUEADOR CRÍTICO`, 'error');
+            }
+
+            exportsElement.innerHTML = results;
+        }
+
+        async function testMemoryPointers() {
+            if (!romLoaded) {
+                log('❌ Nenhuma ROM carregada', 'error');
+                return;
+            }
+
+            log('🧠 Testando ponteiros de memória...');
+            
+            const pointers = [
+                { name: '_get_vram_ptr', alt: 'get_vram_ptr', desc: 'VRAM' },
+                { name: '_get_cram_ptr', alt: 'get_cram_ptr', desc: 'CRAM' },
+                { name: '_get_vsram_ptr', alt: 'get_vsram_ptr', desc: 'VSRAM' },
+                { name: '_get_sat_ptr', alt: 'get_sat_ptr', desc: 'SAT' },
+                { name: '_get_vdp_regs_ptr', alt: 'get_vdp_regs_ptr', desc: 'VDP Registers' }
+            ];
+
+            let memoryResults = '<h3>Teste de Ponteiros:</h3>';
+            
+            for (const pointer of pointers) {
+                try {
+                    let fn = null;
+                    
+                    if (emulatorModule[pointer.name]) {
+                        fn = emulatorModule[pointer.name];
+                    } else if (emulatorModule[pointer.alt]) {
+                        fn = emulatorModule[pointer.alt];
+                    } else if (emulatorModule.cwrap) {
+                        try {
+                            fn = emulatorModule.cwrap(pointer.name, 'number', []);
+                        } catch (e) {
+                            try {
+                                fn = emulatorModule.cwrap(pointer.alt, 'number', []);
+                            } catch (e2) {
+                                // Ignore
+                            }
+                        }
+                    }
+                    
+                    if (fn && typeof fn === 'function') {
+                        const ptr = fn();
+                        if (ptr && ptr > 0) {
+                            memoryResults += `<div style="color: #4CAF50;">✅ ${pointer.desc}: 0x${ptr.toString(16)}</div>`;
+                            log(`✅ ${pointer.desc} ponteiro válido: 0x${ptr.toString(16)}`, 'success');
+                            
+                            // Tentar ler alguns bytes para verificar se contém dados
+                            if (emulatorModule.HEAPU8) {
+                                const sample = emulatorModule.HEAPU8.slice(ptr, ptr + 16);
+                                const hasData = sample.some(byte => byte !== 0);
+                                if (hasData) {
+                                    log(`  📊 ${pointer.desc} contém dados não-zero`, 'success');
+                                } else {
+                                    log(`  ⚠️ ${pointer.desc} contém apenas zeros`, 'warning');
+                                }
+                            }
+                        } else {
+                            memoryResults += `<div style="color: #f44336;">❌ ${pointer.desc}: ponteiro nulo (${ptr})</div>`;
+                            log(`❌ ${pointer.desc} retornou ponteiro nulo: ${ptr}`, 'error');
+                        }
+                    } else {
+                        memoryResults += `<div style="color: #f44336;">❌ ${pointer.desc}: função não encontrada</div>`;
+                        log(`❌ ${pointer.desc}: função não encontrada`, 'error');
+                    }
+                } catch (error) {
+                    memoryResults += `<div style="color: #f44336;">❌ ${pointer.desc}: erro - ${error.message}</div>`;
+                    log(`❌ Erro ao testar ${pointer.desc}: ${error.message}`, 'error');
+                }
+            }
+            
+            memoryElement.innerHTML = memoryResults;
+        }
+
+        // Setup do arquivo ROM
+        document.addEventListener('DOMContentLoaded', () => {
+            const romFileInput = document.getElementById('romFile');
+            const testMemoryBtn = document.getElementById('testMemoryBtn');
+            
+            romFileInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    log(`📁 ROM selecionada: ${file.name} (${file.size} bytes)`);
+                    romLoaded = true;
+                    testMemoryBtn.disabled = false;
+                    
+                    // Simular carregamento da ROM (aqui você carregaria no emulador)
+                    log('⚠️ NOTA: Este teste não carrega a ROM no emulador, apenas verifica as exportações', 'warning');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

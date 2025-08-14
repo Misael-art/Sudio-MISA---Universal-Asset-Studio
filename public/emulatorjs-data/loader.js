@@ -70,13 +70,25 @@
     }
 
     if (("undefined" != typeof EJS_DEBUG_XX && true === EJS_DEBUG_XX)) {
+        console.log("[EMULATOR][loader] Modo debug ativo. Carregando arquivos não minificados.");
         for (let i = 0; i < scripts.length; i++) {
             await loadScript(scripts[i]);
         }
         await loadStyle("emulator.css");
     } else {
+        console.log("[EMULATOR][loader] Carregando arquivos minificados...");
         await loadScript("emulator.min.js");
         await loadStyle("emulator.min.css");
+        // Verificação adicional: se o minificado não definiu EmulatorJS, fazer fallback automático
+        if (typeof window.EmulatorJS !== "function") {
+            console.warn("[EMULATOR][loader] emulator.min.js não definiu EmulatorJS. Iniciando fallback para src/*.");
+            for (let i = 0; i < scripts.length; i++) {
+                await loadScript(scripts[i]);
+            }
+            await loadStyle("emulator.css");
+        } else {
+            console.log("[EMULATOR][loader] EmulatorJS detectado após carregar minificado.");
+        }
     }
     const config = {};
     config.gameUrl = window.EJS_gameUrl;
@@ -147,6 +159,46 @@
         }
     }
 
+    // CORREÇÃO CRÍTICA: Verificação robusta antes de instanciar EmulatorJS
+    if (typeof window.EmulatorJS !== "function") {
+        console.error("[EMULATOR][loader] ❌ Falha crítica: EmulatorJS indisponível após tentativa de carregamento.");
+        console.error("[EMULATOR][loader] - Tipo de EmulatorJS:", typeof window.EmulatorJS);
+        console.error("[EMULATOR][loader] - Scripts carregados:", Array.from(document.querySelectorAll('script')).map(s => s.src).filter(src => src.includes('emulator')));
+        throw new Error("EmulatorJS não pôde ser carregado. Verifique os arquivos em public/emulatorjs-data.");
+    }
+    
+    // Verificação adicional de dependências críticas
+    console.log("[EMULATOR][loader] ✅ EmulatorJS disponível. Verificando dependências...");
+    console.log("[EMULATOR][loader] - EmulatorJS:", typeof window.EmulatorJS);
+    console.log("[EMULATOR][loader] - EJS_COMPRESSION:", typeof window.EJS_COMPRESSION);
+    console.log("[EMULATOR][loader] - EJS_Runtime:", typeof window.EJS_Runtime);
+    
+    // Aguardar EJS_Runtime se necessário (para cores que precisam)
+    if (config.system && !window.EJS_Runtime) {
+        console.log("[EMULATOR][loader] ⏳ EJS_Runtime não disponível ainda. Aguardando...");
+        
+        // Aguardar até 5 segundos pelo EJS_Runtime
+        let runtimeWaitAttempts = 0;
+        const maxRuntimeWait = 50; // 5 segundos
+        
+        while (!window.EJS_Runtime && runtimeWaitAttempts < maxRuntimeWait) {
+            runtimeWaitAttempts++;
+            
+            if (runtimeWaitAttempts % 10 === 0) {
+                console.log(`[EMULATOR][loader] ⏳ Aguardando EJS_Runtime... ${runtimeWaitAttempts}/${maxRuntimeWait}`);
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
+        if (!window.EJS_Runtime) {
+            console.warn("[EMULATOR][loader] ⚠️ EJS_Runtime não disponível após espera. Prosseguindo mesmo assim...");
+        } else {
+            console.log("[EMULATOR][loader] ✅ EJS_Runtime detectado:", typeof window.EJS_Runtime);
+        }
+    }
+    
+    console.log("[EMULATOR][loader] 🚀 Instanciando EmulatorJS com configuração:", { system: config.system, dataPath: config.dataPath, gameUrl: !!config.gameUrl });
     window.EJS_emulator = new EmulatorJS(EJS_player, config);
     window.EJS_adBlocked = (url, del) => window.EJS_emulator.adBlocked(url, del);
     if (typeof window.EJS_ready === "function") {

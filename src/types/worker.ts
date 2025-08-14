@@ -4,7 +4,7 @@
 /**
  * Tipos de mensagem que podem ser enviadas para o worker
  */
-export type WorkerMessageType = 'LOAD_ROM' | 'EXTRACT_ASSETS' | 'INITIALIZE_EMULATOR' | 'LOAD_ROM_EMULATOR' | 'EMULATION_CONTROL' | 'START_EMULATION' | 'PAUSE_EMULATION' | 'STOP_EMULATION';
+export type WorkerMessageType = 'LOAD_ROM' | 'EXTRACT_ASSETS' | 'INITIALIZE_EMULATOR' | 'LOAD_ROM_EMULATOR' | 'EMULATION_CONTROL' | 'START_EMULATION' | 'PAUSE_EMULATION' | 'STOP_EMULATION' | 'GET_ROM_INFO';
 
 /**
  * Sistemas de console suportados
@@ -34,7 +34,6 @@ export interface WorkerResponse {
   status: WorkerStatus;
   message: string;
   payload?: WorkerPayload;
-  isMock?: boolean;
 }
 
 /**
